@@ -156,7 +156,7 @@ export interface AuthorizationEnvironment {
   APPLE_ALLOWED_ENVIRONMENTS?: string;
   /** Comma-separated Apple environments accepted for signed notifications. */
   APPLE_NOTIFICATION_ENVIRONMENTS?: string;
-  /** Comma-separated CFBundleVersion values uploaded to TestFlight. */
+  /** Comma-separated CFBundleShortVersionString values uploaded to TestFlight. */
   APPLE_TESTFLIGHT_BUILD_VERSIONS?: string;
   /** Pins the Xcode StoreKit Test signing certificate for an isolated development Worker. */
   XCODE_STOREKIT_CERTIFICATE_SHA256?: string;
@@ -437,7 +437,7 @@ function validTestFlightAppTransaction(
   if (!appTransaction || transaction.environment !== "Sandbox") return false;
   // TestFlight uses Apple's Sandbox environment. Sandbox is not, by itself,
   // evidence that the request came from an uploaded build; development-signed
-  // apps can use it too, hence the additional signed fields and build allowlist.
+  // apps can use it too, hence the additional signed fields and app-version allowlist.
   return appTransaction.receiptType === "Sandbox"
     && appTransaction.bundleId === (env.APPLE_BUNDLE_ID ?? "com.orbeworks.adless")
     // Apple omits appAppleId/appID from AppTransaction in Sandbox and Xcode.

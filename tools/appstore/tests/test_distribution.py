@@ -207,8 +207,7 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_promotion_workflows_open_only_the_expected_pull_requests(self):
         workflows = (
-            ("open-develop-to-beta-pr.yml", "develop", "beta"),
-            ("open-beta-to-main-pr.yml", "beta", "main"),
+            ("open-develop-to-main-pr.yml", "develop", "main"),
         )
         for filename, head, base in workflows:
             with self.subTest(filename=filename):

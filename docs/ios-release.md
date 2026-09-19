@@ -72,9 +72,9 @@ estão no [README iOS](../apps/ios/README.md).
 
 O [wrangler.toml](../apps/dns-worker/wrangler.toml) local aceita Production
 normalmente; Sandbox depende de `AppTransaction` Apple-signed e da allowlist
-`APPLE_TESTFLIGHT_BUILD_VERSIONS`. Na verificação local essa lista contém `2`, `6` e `7`,
-mas o workflow escolhe build number dinamicamente. **Pending:** antes de testar
-um novo build, comparar o número realmente enviado com a configuração remota
+`APPLE_TESTFLIGHT_BUILD_VERSIONS`. Na verificação local essa lista contém `1.0.2`,
+mas o workflow escolhe a versão comercial dinamicamente. **Pending:** antes de testar
+uma nova versão, comparar a versão realmente enviada com a configuração remota
 publicada e validar o gate; o workflow iOS não altera/publica o Worker. Mudar a
 allowlist ou publicar o Worker exige autorização explícita. Não abrir Sandbox
 indiscriminadamente para contornar erro. Evidências de download e allowlist não
@@ -173,25 +173,25 @@ python3 tools/appstore/appstore_connect.py --help
 ## Automação de distribuição
 
 **Implemented:** Xcode Cloud mantém os workflows oficiais de TestFlight na
-`beta` e de App Store na `main`; GitHub Actions não possui workflows iOS.
+`develop` e de App Store na `main`; GitHub Actions não possui workflows iOS.
 Execução manual respeita os mesmos guards de branch.
-A política operacional é develop → beta → main, mas o código não
-comprova proteção de branches ou revisão obrigatória. Disparar workflow ou push
+A política operacional é develop → main, mas o código não comprova proteção de
+branches ou revisão obrigatória. Disparar workflow ou push
 pode publicar: exige autorização explícita, assim como upload/submissão manual.
 
 O trabalho começa na `develop`, usando `Adless Dev`, StoreKit local e o Worker
 de desenvolvimento; essa branch não alimenta TestFlight. Seus commits são
-promovidos para `beta` e depois `main`, incluindo os arquivos Dev, mas esses
+promovidos diretamente para `main`, incluindo os arquivos Dev, mas esses
 arquivos permanecem inativos fora do scheme/configuração e do ambiente Wrangler
 selecionados explicitamente. Os testes TestFlight Internal e External partem
-ambos da `beta`, em workflows Xcode Cloud independentes, usando o app oficial
+ambos de `develop`, em workflows Xcode Cloud independentes, usando o app oficial
 `Adless`. A `main` fica reservada à distribuição pública/App Store e aos serviços
 de produção.
 
 | Fluxo | Comportamento presente no workflow |
 | --- | --- |
-| `beta` → TestFlight interno | Archive Release, exportação **internal-only**, inspeção, validação Apple, autorização do número no Worker, upload, espera VALID e associação somente ao grupo interno configurado |
-| `beta` → TestFlight externo | Exportação sem restrição internal-only, mesmos gates, associação somente aos grupos externos do app e submissão à Beta App Review quando necessária; notificações automáticas quando aprovado |
+| `develop` → TestFlight interno | Archive Release, exportação **internal-only**, inspeção, validação Apple, autorização da versão no Worker, upload, espera VALID e associação somente ao grupo interno configurado |
+| `develop` → TestFlight externo | Exportação sem restrição internal-only, mesmos gates, associação somente aos grupos externos do app e submissão à Beta App Review quando necessária; notificações automáticas quando aprovado |
 | `main` → App Store produção | Verifica versão previamente preparada, archive/exportação/inspeção, valida/upload, espera VALID, define `releaseType=AFTER_APPROVAL`, anexa e submete à revisão pública |
 
 O número de build é superior aos números conhecidos pela API; os três fluxos
@@ -201,7 +201,7 @@ por branch. A exportação não renumera o binário. O archive automático inter
 pode usar assinatura de desenvolvimento; o IPA exportado passa pelo verificador
 completo de distribuição, assinatura, endpoint, versão e número esperados.
 
-Os dois workflows da `beta` atualizam somente `APPLE_TESTFLIGHT_BUILD_VERSIONS` nas settings
+Os dois workflows de TestFlight atualizam somente `APPLE_TESTFLIGHT_BUILD_VERSIONS` nas settings
 do Worker existente após validação Apple e antes do upload. Não enviam código
 dessas branches ao Worker de produção. Os demais bindings são herdados na
 Cloudflare, incluindo o secret opaco; a leitura posterior confirma a alteração.
@@ -295,7 +295,7 @@ ambiente, build, resultado e responsável, sem credenciais.
 | TestFlight externo | Informações de beta/revisão, grupo e convites preparados; primeiro build aprovado na TestFlight App Review e teste externo realizado |
 | App Store pública | Metadata/privacidade/produtos aprovados, build correto anexado, revisão aprovada, opção de lançamento conferida e disponibilidade pública verificada; compra Production testada separadamente com autorização |
 
-TestFlight externo passa pelo fluxo da `beta` e sua beta review. A
+TestFlight externo passa pelo fluxo de `develop` e sua beta review. A
 [documentação Apple](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/)
 explica grupo externo, revisão e distribuição. A aprovação TestFlight não é
 aprovação da App Store pública. Sucesso de `attach-submit` significa submissão,

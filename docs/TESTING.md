@@ -127,7 +127,7 @@ tools/ios/install_adless_dev.sh
 
 O instalador valida bundle ID, ambiente, endpoint e entitlements antes de
 instalar, depois inicia o app pelo LaunchAction `Adless Dev` do Xcode. Esse teste
-não é equivalente ao TestFlight: a `beta` alimenta separadamente TestFlight
+não é equivalente ao TestFlight: `develop` alimenta separadamente TestFlight
 Internal e External, que usam o Sandbox da Apple e o app oficial.
 
 ## Matriz manual no iPhone

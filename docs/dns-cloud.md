@@ -128,7 +128,7 @@ arquivo. `workers.dev` usa hostname fornecido pela Cloudflare;
 | `APPLE_BUNDLE_ID`, `APPLE_APP_ID` | Identificadores esperados de app e notificações Apple; fonte canônica é o TOML |
 | `APPLE_ALLOWED_ENVIRONMENTS` | Localmente `Production` no registro normal |
 | `APPLE_NOTIFICATION_ENVIRONMENTS` | Localmente `Production,Sandbox` |
-| `APPLE_TESTFLIGHT_BUILD_VERSIONS` | Allowlist local dos builds `2` e `6`; não comprova que esses builds foram carregados/aprovados no TestFlight |
+| `APPLE_TESTFLIGHT_BUILD_VERSIONS` | Allowlist local da versão `1.0.2`; não comprova que essa versão foi carregada/aprovada no TestFlight |
 | `XCODE_STOREKIT_CERTIFICATE_SHA256` | Somente no ambiente `development`; allowlist separada por vírgulas dos certificados ES256 presentes no `x5c` dos JWS StoreKit 2 do simulador e do aparelho físico. O certificado exportado por **Editor → Save Public Certificate** valida recibos locais e não deve ser presumido igual aos certificados dos JWS |
 
 O ambiente Wrangler `development` publica `adless-dns-development` e declara
@@ -137,12 +137,12 @@ aceita somente `environment=Xcode` e `com.orbeworks.adless.dev`; notificações
 Apple e TestFlight ficam desabilitados. O alvo top-level de produção conserva
 seus bindings, segredo, bundle e políticas Production/Sandbox.
 
-**Implemented (automação):** os uploads interno e externo da `beta` adicionam o
-número validado pela Apple à allowlist do Worker de produção,
+**Implemented (automação):** os uploads interno e externo de TestFlight a partir
+de `develop` adicionam a versão validada pela Apple à allowlist do Worker de produção,
 via `tools/dns-worker/testflight_builds.py`. O PATCH modifica somente esse binding;
 os demais são herdados no servidor. Não faz deploy de código dessas branches,
 não abre Sandbox genericamente e não toca KV/DO ou rotas. O deploy de código
-da `main` une os números locais aos publicados antes de enviar o Worker.
+da `main` une as versões locais às publicadas antes de enviar o Worker.
 Os workflows serializam essas operações; não serializam alterações manuais
 fora do GitHub. Consultar [distribuição iOS](ios-release.md#automação-de-distribuição)
 para secrets, pré-requisitos e limites da evidência.
@@ -227,11 +227,11 @@ versões do major, sem fixação de minor.
 
 O Worker `adless-dns-development` é publicado pelo Cloudflare Workers Builds a
 partir da branch `develop`, com o ambiente Wrangler `development`. Ele não
-modifica o Worker de produção nem a allowlist de builds TestFlight.
+modifica o Worker de produção nem a allowlist de versões TestFlight.
 
 Para migrar também a produção para o Cloudflare Workers Builds, use
 [`tools/dns-worker/deploy-production.sh`](../tools/dns-worker/deploy-production.sh)
-como Deploy command. O script consulta e preserva a allowlist de builds
+como Deploy command. O script consulta e preserva a allowlist de versões
 TestFlight antes de publicar `adless-dns`; os Build secrets
 `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` são obrigatórios.
 

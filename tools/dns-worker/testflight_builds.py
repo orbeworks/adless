@@ -24,7 +24,7 @@ API_ROOT = "https://api.cloudflare.com/client/v4"
 
 def parse_builds(value: str) -> set[str]:
     if not isinstance(value, str) or len(value) > 4096:
-        raise ValueError("Invalid TestFlight build allowlist")
+        raise ValueError("Invalid TestFlight app-version allowlist")
     if not value.strip():
         return set()
     builds = {part.strip() for part in value.split(",")}
