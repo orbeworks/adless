@@ -1078,9 +1078,12 @@ export async function handleAuthorizationRegister(
     || appTransactionJWS.length > 128 * 1024
     || (hasCurrentCredentialProof
       && (!TOKEN_PATTERN.test(currentDnsToken) || !TOKEN_PATTERN.test(currentStatsToken)))) {
+    console.warn("authorization.register.rejected", { reason: "invalid_request" });
     return jsonResponse({ error: "invalid request" }, 400);
   }
 
+  let appleEnvironment: AppleEnvironment | undefined;
+  let appVersion: string | undefined;
   try {
     const now = dependencies.now?.() ?? Date.now();
     const jwsOptions = {
@@ -1091,11 +1094,13 @@ export async function handleAuthorizationRegister(
     const transaction = dependencies.verifyTransaction
       ? await dependencies.verifyTransaction(transactionJWS)
       : await verifyAppleJWS<AppleTransactionPayload>(transactionJWS, jwsOptions);
+    appleEnvironment = transaction.environment;
     const appTransaction = appTransactionJWS.length > 0
       ? dependencies.verifyAppTransaction
         ? await dependencies.verifyAppTransaction(appTransactionJWS)
         : await verifyAppleJWS<AppleAppTransactionPayload>(appTransactionJWS, jwsOptions)
       : undefined;
+    appVersion = appTransaction?.applicationVersion;
     const result = await registerInstallation(
       env,
       installationId,
@@ -1105,8 +1110,18 @@ export async function handleAuthorizationRegister(
       rotationNonce,
       hasCurrentCredentialProof ? { dnsToken: currentDnsToken, statsToken: currentStatsToken } : undefined,
     );
+    console.info("authorization.register.accepted", {
+      appleEnvironment,
+      appVersion: appVersion ?? null,
+      hasAppTransaction: Boolean(appTransaction),
+    });
     return jsonResponse(result);
   } catch {
+    console.warn("authorization.register.rejected", {
+      appleEnvironment: appleEnvironment ?? null,
+      appVersion: appVersion ?? null,
+      reason: "transaction_not_authorized",
+    });
     return jsonResponse({ error: "transaction not authorized" }, 401);
   }
 }
