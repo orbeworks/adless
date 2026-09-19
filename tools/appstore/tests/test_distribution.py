@@ -137,6 +137,27 @@ class DistributionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "MARKETING_VERSION"):
                 asc.command_testflight_preflight(self.client, args)
 
+    def test_next_marketing_skips_closed_train_and_reuses_open_train(self):
+        args = argparse.Namespace(app_id="app", current_version="1.0.1")
+        self.client.all_resources.side_effect = lambda path: [
+            resource("closed", platform="IOS", versionString="1.0.1", appStoreState="READY_FOR_SALE"),
+            resource("open", platform="IOS", versionString="1.0.2", appStoreState="PREPARE_FOR_SUBMISSION"),
+        ]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            asc.command_next_marketing(self.client, args)
+        self.assertEqual("1.0.2\n", output.getvalue())
+
+    def test_next_marketing_advances_after_open_train_is_closed(self):
+        args = argparse.Namespace(app_id="app", current_version="1.0.1")
+        self.client.all_resources.side_effect = lambda path: [
+            resource("closed", platform="IOS", versionString="1.0.2", appStoreState="READY_FOR_SALE"),
+        ]
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            asc.command_next_marketing(self.client, args)
+        self.assertEqual("1.0.3\n", output.getvalue())
+
     def test_main_sets_automatic_release_and_submits_public_review(self):
         version = resource("version", appStoreState="PREPARE_FOR_SUBMISSION")
         self.client.request.side_effect = None

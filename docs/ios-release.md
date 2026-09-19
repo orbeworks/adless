@@ -225,7 +225,7 @@ actionlint rodam no pre-push para alterações nos caminhos de distribuição;
 não acrescentam uma suíte ao Actions.
 
 [appstore_connect.py](../tools/appstore/appstore_connect.py) usa stdlib Python e
-OpenSSL, JWT ASC temporário e polling limitado. `preflight`, `next-build` e
+OpenSSL, JWT ASC temporário e polling limitado. `preflight`, `next-build`, `next-marketing` e
 `wait-build` consultam a API; não imprimem JWT. `add-beta-build`, `distribute-beta`
 e `attach-submit` alteram estado remoto. `preflight` ignora estados conhecidos em revisão/lançamento;
 versão inexistente e estados não suportados falham. Se criar a submissão falhar
@@ -233,6 +233,12 @@ após anexar o build, é necessária conclusão manual. O script não cria metad
 produtos, preços ou oferta. Erros HTTP não imprimem o corpo remoto.
 
 Secrets necessários são `ASC_KEY_ID`, `ASC_ISSUER_ID` e `ASC_PRIVATE_KEY`.
+O `ci_scripts/ci_pre_xcodebuild.sh` usa esses secrets para consultar a versão
+fechada mais recente no App Store Connect, reutilizar uma versão aberta ou
+selecionar automaticamente o próximo patch. Ele aplica essa versão com
+`agvtool` no checkout temporário do Xcode Cloud e usa `CI_BUILD_NUMBER` como
+`CFBundleVersion`; nenhuma alteração é feita no commit local. `ASC_APP_ID` é
+opcional e, por padrão, usa o app oficial `6803552143`.
 TestFlight também exige `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` para
 atualizar a allowlist no Worker existente (mesmos nomes do deploy do Worker).
 `SENTRY_AUTH_TOKEN` é opcional para dSYMs. Os workflows materializam `.p8` no
