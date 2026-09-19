@@ -5,7 +5,7 @@ workers_dev = true
 preview_urls = false
 
 [observability]
-enabled = false
+enabled = true
 
 [vars]
 DEPLOYMENT_ENV = "production"
