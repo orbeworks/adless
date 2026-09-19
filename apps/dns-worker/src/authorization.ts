@@ -1110,11 +1110,6 @@ export async function handleAuthorizationRegister(
       rotationNonce,
       hasCurrentCredentialProof ? { dnsToken: currentDnsToken, statsToken: currentStatsToken } : undefined,
     );
-    console.info("authorization.register.accepted", {
-      appleEnvironment,
-      appVersion: appVersion ?? null,
-      hasAppTransaction: Boolean(appTransaction),
-    });
     return jsonResponse(result);
   } catch {
     console.warn("authorization.register.rejected", {
