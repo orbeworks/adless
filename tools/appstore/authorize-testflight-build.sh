@@ -13,6 +13,11 @@ cd "$repo_root"
 : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID secret is required}"
 
 app_id="${ADLESS_APP_STORE_ID:-6803552143}"
+app_version="${ADLESS_APP_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$CI_ARCHIVE_PATH/Products/Applications/Adless.app/Info.plist" 2>/dev/null || true)}"
+if [[ -z "$app_version" ]]; then
+  echo "ADLESS_APP_VERSION or an archived CFBundleShortVersionString is required" >&2
+  exit 1
+fi
 
 python3 tools/appstore/appstore_connect.py \
   --key-id "$ASC_KEY_ID" \
@@ -23,4 +28,4 @@ python3 tools/appstore/appstore_connect.py \
   --build-number "$BUILD_NUMBER"
 
 python3 tools/dns-worker/testflight_builds.py add \
-  --build-number "$BUILD_NUMBER"
+  --app-version "$app_version"
