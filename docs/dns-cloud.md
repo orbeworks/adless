@@ -211,18 +211,19 @@ como smoke.
 
 ## Deploy autorizado e smoke
 
-**Implemented:** [.github/workflows/deploy-dns-worker.yml](../.github/workflows/deploy-dns-worker.yml)
-publica em push de caminhos selecionados na `main` ou `workflow_dispatch`.
-Tem concurrency com cancelamento, timeout de 15 minutos e `contents: read`;
-usa `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` vindos de GitHub Secrets.
+**Implemented:** Cloudflare Workers Builds publica a produção a partir da
+branch `main`. O Deploy command é
+[`tools/dns-worker/deploy-production.sh`](../tools/dns-worker/deploy-production.sh),
+que preserva a allowlist TestFlight antes do deploy e verifica os valores
+publicados. Os Build secrets `CLOUDFLARE_API_TOKEN` e
+`CLOUDFLARE_ACCOUNT_ID` são obrigatórios.
 Esses secrets administrativos não pertencem ao iPhone. Permissões devem se
 limitar aos recursos envolvidos; a configuração atual não exige uma zone para
 rota customizada. **Pending:** conferir escopo efetivo e presença dos secrets.
 
-O workflow prepara/valida lista e executa build, mas não executa a suíte Worker
-nem smoke após deploy. Mudanças apenas em package/lock da raiz não constam nos
-paths do gatilho. `wrangler@4` acompanha versões do major, sem fixação de minor.
-Essas limitações foram registradas, não corrigidas nesta auditoria.
+O build prepara/valida a lista e compila o Worker; a suíte Worker continua no
+pre-push local e o smoke após deploy permanece manual. `wrangler@4` acompanha
+versões do major, sem fixação de minor.
 
 O Worker `adless-dns-development` é publicado pelo Cloudflare Workers Builds a
 partir da branch `develop`, com o ambiente Wrangler `development`. Ele não
