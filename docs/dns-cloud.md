@@ -224,10 +224,9 @@ nem smoke após deploy. Mudanças apenas em package/lock da raiz não constam no
 paths do gatilho. `wrangler@4` acompanha versões do major, sem fixação de minor.
 Essas limitações foram registradas, não corrigidas nesta auditoria.
 
-[deploy-dns-worker-development.yml](../.github/workflows/deploy-dns-worker-development.yml)
-é independente: publica somente o ambiente Wrangler `development` em push da
-`develop`, executa a suíte do Worker e verifica o health Dev. Ele não modifica o
-Worker de produção nem a allowlist de builds TestFlight.
+O Worker `adless-dns-development` é publicado pelo Cloudflare Workers Builds a
+partir da branch `develop`, com o ambiente Wrangler `development`. Ele não
+modifica o Worker de produção nem a allowlist de builds TestFlight.
 
 Após autorização explícita, revisão do diff, testes e conferência do alvo:
 

@@ -154,7 +154,7 @@ permanecem **Pending** até inspeção autorizada do estado remoto.
 | Workflow | Gatilho declarado | Ação e lacuna observável |
 | --- | --- | --- |
 | [deploy-dns-worker.yml](../.github/workflows/deploy-dns-worker.yml) | `main` com filtros de caminho; manual | Prepara/valida lista, compila e publica Worker. Não executa suíte Worker nem smoke após deploy. Filtros não incluem pacote/lock da raiz. Runbook: [dns-cloud.md](dns-cloud.md). |
-| [deploy-dns-worker-development.yml](../.github/workflows/deploy-dns-worker-development.yml) | `develop` com filtros de caminho; manual | Testa, prepara, valida e publica somente `adless-dns-development`; verifica o health do ambiente Dev. |
+| Cloudflare Workers Builds (development) | branch `develop` do repositório conectado ao Worker `adless-dns-development` | Prepara, valida, compila e publica o ambiente Dev diretamente no Cloudflare. |
 | Railway landing | conexão direta ao repositório `andre-fig/adless`, branch `main` | O serviço Railway usa `apps/landing-page` como raiz e publica após push; não passa pelo GitHub Actions. |
 | [update-blocklist.yml](../.github/workflows/update-blocklist.yml) | Domingo 03:17 UTC; manual | Testa/gera/valida e faz commit/push de seis artefatos; não publica Worker ou Railway diretamente. |
 | Xcode Cloud | `beta` e `main`, configurados no App Store Connect | `beta`: TestFlight interno e externo em workflows isolados. `main`: App Store com liberação após aprovação. |
