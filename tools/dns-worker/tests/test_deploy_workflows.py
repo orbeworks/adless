@@ -1,4 +1,4 @@
-"""Offline contracts for the production Worker workflow."""
+"""Offline contracts for the production Worker deploy command."""
 from __future__ import annotations
 
 import unittest
@@ -10,27 +10,15 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 
 
 class WorkerDeployWorkflowContractTests(unittest.TestCase):
-    def assert_health_contract(self, filename: str, endpoint: str, environment: str) -> None:
-        workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
-        compact = " ".join(
-            line.strip().removesuffix("\\").rstrip()
-            for line in workflow.splitlines()
-            if line.strip()
+    def test_production_deploy_command_preserves_allowlist_and_deploys_worker(self):
+        deploy_script = (ROOT / "tools" / "dns-worker" / "deploy-production.sh").read_text(
+            encoding="utf-8"
         )
-        expected = (
-            'curl --fail --silent --show-error --retry 3 '
-            f'"{endpoint}/healthz" '
-            "| python3 -c 'import json, sys; data=json.load(sys.stdin); "
-            f'assert data == {{"status": "ok", "environment": "{environment}"}}, data\''
-        )
-        self.assertIn(expected, compact)
-
-    def test_production_health_check_uses_the_production_endpoint_and_environment(self):
-        self.assert_health_contract(
-            "deploy-dns-worker.yml",
-            "https://adless-dns.orbeworks.workers.dev",
-            "production",
-        )
+        self.assertIn("merge-for-deploy", deploy_script)
+        self.assertIn("--print-builds", deploy_script)
+        self.assertIn("wrangler@4 deploy", deploy_script)
+        self.assertIn("APPLE_TESTFLIGHT_BUILD_VERSIONS:$testflight_builds", deploy_script)
+        self.assertIn("testflight_builds.py verify", deploy_script)
 
 
 if __name__ == "__main__":
