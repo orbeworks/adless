@@ -3,9 +3,11 @@
 set -euo pipefail
 
 # Xcode Cloud discovers scripts in ci_scripts/ next to the Xcode project.
-# Enable this only in workflows that upload a production TestFlight build.
-if [[ "${ADLESS_AUTHORIZE_TESTFLIGHT_BUILD:-}" != "1" ]]; then
-  echo "Skipping TestFlight Worker authorization (ADLESS_AUTHORIZE_TESTFLIGHT_BUILD != 1)."
+# TestFlight workflows are identified by their workflow name. The explicit
+# flag remains available for a workflow with a different naming convention.
+workflow_name="${CI_WORKFLOW:-}"
+if [[ "${ADLESS_AUTHORIZE_TESTFLIGHT_BUILD:-}" != "1" && ! "$workflow_name" =~ [Tt][Ee][Ss][Tt][Ff][Ll][Ii][Gg][Hh][Tt] ]]; then
+  echo "Skipping TestFlight Worker authorization (workflow is not TestFlight)."
   exit 0
 fi
 

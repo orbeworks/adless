@@ -244,9 +244,11 @@ upload/submissão ou `-allowProvisioningUpdates` sem autorização para a ação
 Após o archive/upload do TestFlight, o Xcode Cloud deve executar o script
 versionado [`apps/ios/ci_scripts/ci_post_xcodebuild.sh`](../apps/ios/ci_scripts/ci_post_xcodebuild.sh).
 O Xcode Cloud detecta esse script automaticamente por ele estar em
-`ci_scripts/`, ao lado do projeto Xcode. No workflow de TestFlight de produção,
-defina a variável `ADLESS_AUTHORIZE_TESTFLIGHT_BUILD=1`; nos demais workflows,
-deixe-a ausente ou com outro valor. O script extrai o `CFBundleVersion` do
+`ci_scripts/`, ao lado do projeto Xcode. O script executa automaticamente
+somente quando `CI_WORKFLOW` contém `TestFlight` (a variável
+`ADLESS_AUTHORIZE_TESTFLIGHT_BUILD=1` continua disponível como exceção caso o
+workflow tenha outro nome). Nos demais workflows, ele apenas ignora a etapa.
+O script extrai o `CFBundleVersion` do
 archive, aguarda o build ficar `VALID` na Apple e só então adiciona esse número
 à allowlist do Worker. Ele aceita a chave ASC como `ASC_PRIVATE_KEY` (a forma
 recomendada no Xcode Cloud) ou como `ASC_KEY_PATH`, além de exigir
