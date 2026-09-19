@@ -21,7 +21,7 @@ if [[ "${CI_XCODEBUILD_EXIT_CODE:-0}" != "0" ]]; then
   exit 0
 fi
 
-repo_root="${CI_WORKSPACE_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 archive_path="${CI_ARCHIVE_PATH:-}"
 
 if [[ -z "$archive_path" ]]; then
