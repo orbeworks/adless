@@ -4,7 +4,7 @@
 
 - **Verified:** Production e Sandbox têm App Store Server Notifications **V2**
   salvas no App Store Connect para `com.orbeworks.adless`, app `6803552143`.
-  URL de ambos: `https://adless-dns.adless-production.workers.dev/v1/notifications/apple`.
+  URL de ambos: `https://adless-dns.orbeworks.workers.dev/v1/notifications/apple`.
   Conferência posterior pelo portal e por GET autenticado da API oficial.
 - **Verified:** App Groups foi desabilitado no App ID. Somente Network Extensions
   e In-App Purchase permanecem selecionados no portal. Não foi removido o

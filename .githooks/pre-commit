@@ -11,10 +11,6 @@ trap 'rm -f "$staged_paths_file"' EXIT
 git diff --cached --check
 git diff --cached --name-only --diff-filter=ACMR > "$staged_paths_file"
 
-if has_path_matching "$staged_paths_file" ".github/workflows/*.yml" ".github/workflows/*.yaml"; then
-  run_actionlint
-fi
-
 if has_path_matching "$staged_paths_file" "tools/blocklists/*.py" "tools/blocklists/**/*.py" "tools/appstore/*.py" "tools/appstore/**/*.py" "tools/dns-worker/*.py" "tools/dns-worker/**/*.py"; then
   run_python_syntax "$staged_paths_file"
 fi

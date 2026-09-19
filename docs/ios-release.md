@@ -25,12 +25,12 @@ Testes detalhados: [TESTING](TESTING.md). Metadata e texto para revisão:
 | App Store pública | Distribuição oficial e compras Production, com aprovação/publicação separadas do sucesso do upload |
 
 `Development.xcconfig` aponta para
-`https://adless-dns-development.adless-production.workers.dev`; KV, Durable
+`https://adless-dns-development.orbeworks.workers.dev`; KV, Durable
 Objects e segredo de derivação são isolados do Worker oficial. Somente esse
 ambiente aceita `environment=Xcode`, o bundle `com.orbeworks.adless.dev`, uma
 AppTransaction correspondente e um certificado de assinatura StoreKit presente
 na allowlist SHA-256 do ambiente Dev. `Production.xcconfig` continua apontando para
-`https://adless-dns.adless-production.workers.dev` e não aceita transações Xcode.
+`https://adless-dns.orbeworks.workers.dev` e não aceita transações Xcode.
 No simulador Debug lançado sem
 `-useStoreKitProducts`, há opções somente visuais com `Product == nil` e compra
 indisponível. Os LaunchActions incluem esse argumento para StoreKit local.
@@ -83,7 +83,7 @@ builds de desenvolvimento também podem produzir transações Sandbox Apple-sign
 
 **Pending no portal:** configurar Version 2 explicitamente para Production e
 Sandbox em App Information → App Store Server Notifications, com a URL sem
-credencial `https://adless-dns.adless-production.workers.dev/v1/notifications/apple`.
+credencial `https://adless-dns.orbeworks.workers.dev/v1/notifications/apple`.
 A Apple [documenta ambos os campos](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/enter-server-urls-for-app-store-server-notifications/).
 Confirmar entrega de testes e eventos reais de assinatura nos dois ambientes,
 sem copiar payloads/JWS para logs ou relatórios. Um endpoint no código não prova
@@ -240,6 +240,21 @@ diretório temporário do runner com permissão 600; existência dos secrets e
 permissões da chave são **Pending** de verificação externa. Nunca mostrar
 conteúdo, JWT ou comandos com valores resolvidos. Não executar scripts de
 upload/submissão ou `-allowProvisioningUpdates` sem autorização para a ação.
+
+Após o archive/upload do TestFlight, o Xcode Cloud deve executar o script
+versionado [`apps/ios/ci_scripts/ci_post_xcodebuild.sh`](../apps/ios/ci_scripts/ci_post_xcodebuild.sh).
+O Xcode Cloud detecta esse script automaticamente por ele estar em
+`ci_scripts/`, ao lado do projeto Xcode. O script executa automaticamente
+somente quando `CI_WORKFLOW` contém `TestFlight` (a variável
+`ADLESS_AUTHORIZE_TESTFLIGHT_BUILD=1` continua disponível como exceção caso o
+workflow tenha outro nome). Nos demais workflows, ele apenas ignora a etapa.
+O script extrai o `CFBundleVersion` do
+archive, aguarda o build ficar `VALID` na Apple e só então adiciona esse número
+à allowlist do Worker. Ele aceita a chave ASC como `ASC_PRIVATE_KEY` (a forma
+recomendada no Xcode Cloud) ou como `ASC_KEY_PATH`, além de exigir
+`ASC_KEY_ID`, `ASC_ISSUER_ID`, `CLOUDFLARE_API_TOKEN` e
+`CLOUDFLARE_ACCOUNT_ID`. A chave temporária é removida ao terminar; não libera
+versões por curinga.
 
 ### Pendências verificadas em leitura (2026-09-04)
 

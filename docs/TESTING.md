@@ -167,7 +167,7 @@ Executar somente contra alvo/credenciais de teste apropriados. Para o Worker,
 ambiente, sem valores na linha de comando, histórico ou saída:
 
 ```sh
-python3 -B tools/dns/smoke_worker.py --url https://adless-dns.adless-production.workers.dev
+python3 -B tools/dns/smoke_worker.py --url https://adless-dns.orbeworks.workers.dev
 python3 -B tools/dns/smoke_doh.py
 ```
 

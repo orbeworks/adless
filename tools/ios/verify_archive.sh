@@ -21,7 +21,7 @@ app_count="$(find "$archive/Products/Applications" -mindepth 1 -maxdepth 1 -type
 test "$app_count" -eq 1
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "com.orbeworks.adless"
 test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessEnvironment' "$app/Info.plist")" = "production"
-test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessDNSCloudBaseURL' "$app/Info.plist")" = "https://adless-dns.adless-production.workers.dev"
+test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessDNSCloudBaseURL' "$app/Info.plist")" = "https://adless-dns.orbeworks.workers.dev"
 
 if [ -d "$app/PlugIns" ]; then
   plugin_count="$(find "$app/PlugIns" -type d -name '*.appex' -print | wc -l | tr -d '[:space:]')"
