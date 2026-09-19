@@ -127,7 +127,7 @@ Eles ajudam o desenvolvimento local, mas não constituem a CI inteira.
 
 | Hook | O que realmente executa |
 | --- | --- |
-| [pre-commit](../.githooks/pre-commit) | `git diff --cached --check`; actionlint ao tocar workflows; sintaxe Python em blocklists/appstore/dns-worker; lint quando landing ou pacote/lock da raiz entra no stage |
+| [pre-commit](../.githooks/pre-commit) | `git diff --cached --check`; sintaxe Python em blocklists/appstore/dns-worker; lint quando landing ou pacote/lock da raiz entra no stage |
 | [pre-push](../.githooks/pre-push) | Shellcheck nos scripts shell alterados; testes Python blocklists; testes/build Worker; dry-run Wrangler de produção e desenvolvimento ao tocar Worker/deploy; typecheck/build landing; XCTest para iOS; testes offline de distribuição/allowlist e contratos de health check; actionlint para workflows/scripts/exports/hooks; lockfile seleciona Worker e landing |
 
 O pre-push escolhe o primeiro simulador iPhone disponível e usa DerivedData
