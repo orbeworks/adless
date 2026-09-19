@@ -153,10 +153,10 @@ final class BlocklistTests: XCTestCase {
         let token = String(repeating: "A", count: 43)
         let endpoint = try DNSCloudConfiguration.endpointURL(for: token)
 
-        XCTAssertEqual(endpoint.host, "adless-dns.adless-production.workers.dev")
+        XCTAssertEqual(endpoint.host, "adless-dns.orbeworks.workers.dev")
         XCTAssertEqual(endpoint.path, "/\(token)/dns-query")
         XCTAssertTrue(DNSCloudConfiguration.isAdlessEndpoint(endpoint))
-        XCTAssertFalse(DNSCloudConfiguration.isAdlessEndpoint(URL(string: "https://adless-dns.adless-production.workers.dev/v1/stats")!))
+        XCTAssertFalse(DNSCloudConfiguration.isAdlessEndpoint(URL(string: "https://adless-dns.orbeworks.workers.dev/v1/stats")!))
         XCTAssertTrue(InstallationTokenStore.isValid(token))
         XCTAssertFalse(InstallationTokenStore.isValid(String(repeating: "A", count: 42)))
     }

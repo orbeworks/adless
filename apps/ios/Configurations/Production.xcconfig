@@ -3,4 +3,4 @@ ADLESS_ENVIRONMENT = production
 ADLESS_APP_BUNDLE_IDENTIFIER = com.orbeworks.adless
 ADLESS_DISPLAY_NAME = Adless
 ADLESS_TEST_BUNDLE_IDENTIFIER = com.orbeworks.adless.tests
-ADLESS_DNS_CLOUD_BASE_URL = https:/$()/adless-dns.adless-production.workers.dev
+ADLESS_DNS_CLOUD_BASE_URL = https:/$()/adless-dns.orbeworks.workers.dev

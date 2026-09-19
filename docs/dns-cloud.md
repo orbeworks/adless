@@ -12,8 +12,8 @@ privacidade; [TESTING.md](TESTING.md) centraliza cobertura e critérios de teste
 | Estado | Evidência | O que permite concluir |
 | --- | --- | --- |
 | Implemented | [wrangler.toml](../apps/dns-worker/wrangler.toml), [worker.ts](../apps/dns-worker/src/worker.ts), código do workspace | Alvo local `adless-dns`, entrada `src/worker.ts`; não identifica a revisão publicada |
-| Deployed / Verified | GET público de `https://adless-dns.adless-production.workers.dev/healthz`: HTTP 200, `status=ok`, `environment=production` | Há serviço respondendo nesse hostname; health não consulta KV, DO, Apple, blocklist ou upstream |
-| Deployed / Verified | GET público de `https://adless-dns-development.adless-production.workers.dev/healthz`: HTTP 200, `status=ok`, `environment=development`; autorização StoreKit Xcode passou no simulador e no iPhone físico | O Worker Dev está publicado e aceita somente os certificados JWS Xcode explicitamente fixados para `com.orbeworks.adless.dev`; não comprova sozinho a interceptação de consultas DNS |
+| Deployed / Verified | GET público de `https://adless-dns.orbeworks.workers.dev/healthz`: HTTP 200, `status=ok`, `environment=production` | Há serviço respondendo nesse hostname; health não consulta KV, DO, Apple, blocklist ou upstream |
+| Deployed / Verified | GET público de `https://adless-dns-development.orbeworks.workers.dev/healthz`: HTTP 200, `status=ok`, `environment=development`; autorização StoreKit Xcode passou no simulador e no iPhone físico | O Worker Dev está publicado e aceita somente os certificados JWS Xcode explicitamente fixados para `com.orbeworks.adless.dev`; não comprova sozinho a interceptação de consultas DNS |
 | Deployed / Verified | Manifesto público da landing em `https://landing-production-9feb.up.railway.app/blocklists/manifest.json`: HTTP 200, versão `vccdec93540613cc1`, 58.216 domínios | Somente disponibilidade/metadados da lista publicada na landing; não confirma bundle do Worker |
 | Pending | Sem consulta autenticada da conta nesta auditoria | Deployment ID, version ID, código publicado, bindings efetivos, secret, migrations aplicadas, permissões, faturamento, logs e outros Workers da conta |
 | Pending | Sem smoke autenticado ou evento Apple real nesta auditoria | Emissão/rotação, Sandbox/Production, autorização DNS/stats e Notifications V2 remotos |
@@ -30,8 +30,8 @@ arbitrária, listener UDP/TCP ou configuração CORS no Worker.
 
 | Ambiente | Origem HTTPS | Consumidor |
 | --- | --- | --- |
-| Produção | `https://adless-dns.adless-production.workers.dev` | App oficial em TestFlight/App Store |
-| Desenvolvimento | `https://adless-dns-development.adless-production.workers.dev` | `Adless Dev` executado pelo Xcode |
+| Produção | `https://adless-dns.orbeworks.workers.dev` | App oficial em TestFlight/App Store |
+| Desenvolvimento | `https://adless-dns-development.orbeworks.workers.dev` | `Adless Dev` executado pelo Xcode |
 
 Os endpoints abaixo são relativos à origem do ambiente selecionado; KV,
 Durable Objects, segredo, bundle e política StoreKit também são separados.
@@ -191,8 +191,8 @@ npx --yes wrangler@4 deployments list --config apps/dns-worker/wrangler.toml
 npx --yes wrangler@4 versions list --config apps/dns-worker/wrangler.toml
 npx --yes wrangler@4 versions view "$ADLESS_WORKER_VERSION_ID" --config apps/dns-worker/wrangler.toml
 npx --yes wrangler@4 secret list --config apps/dns-worker/wrangler.toml
-curl --fail --silent --show-error https://adless-dns.adless-production.workers.dev/healthz
-curl --fail --silent --show-error https://adless-dns-development.adless-production.workers.dev/healthz
+curl --fail --silent --show-error https://adless-dns.orbeworks.workers.dev/healthz
+curl --fail --silent --show-error https://adless-dns-development.orbeworks.workers.dev/healthz
 ```
 
 `ADLESS_WORKER_VERSION_ID` é o identificador não secreto selecionado na lista,
@@ -249,7 +249,7 @@ Para smoke, disponibilize **dois** tokens descartáveis legítimos e ativos em
 valores no comando, shell history, logs ou URL exibida:
 
 ```sh
-python3 -B tools/dns/smoke_worker.py --url https://adless-dns.adless-production.workers.dev
+python3 -B tools/dns/smoke_worker.py --url https://adless-dns.orbeworks.workers.dev
 python3 -B tools/dns/smoke_doh.py
 ```
 

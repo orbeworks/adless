@@ -25,12 +25,12 @@ Testes detalhados: [TESTING](TESTING.md). Metadata e texto para revisão:
 | App Store pública | Distribuição oficial e compras Production, com aprovação/publicação separadas do sucesso do upload |
 
 `Development.xcconfig` aponta para
-`https://adless-dns-development.adless-production.workers.dev`; KV, Durable
+`https://adless-dns-development.orbeworks.workers.dev`; KV, Durable
 Objects e segredo de derivação são isolados do Worker oficial. Somente esse
 ambiente aceita `environment=Xcode`, o bundle `com.orbeworks.adless.dev`, uma
 AppTransaction correspondente e um certificado de assinatura StoreKit presente
 na allowlist SHA-256 do ambiente Dev. `Production.xcconfig` continua apontando para
-`https://adless-dns.adless-production.workers.dev` e não aceita transações Xcode.
+`https://adless-dns.orbeworks.workers.dev` e não aceita transações Xcode.
 No simulador Debug lançado sem
 `-useStoreKitProducts`, há opções somente visuais com `Product == nil` e compra
 indisponível. Os LaunchActions incluem esse argumento para StoreKit local.
@@ -83,7 +83,7 @@ builds de desenvolvimento também podem produzir transações Sandbox Apple-sign
 
 **Pending no portal:** configurar Version 2 explicitamente para Production e
 Sandbox em App Information → App Store Server Notifications, com a URL sem
-credencial `https://adless-dns.adless-production.workers.dev/v1/notifications/apple`.
+credencial `https://adless-dns.orbeworks.workers.dev/v1/notifications/apple`.
 A Apple [documenta ambos os campos](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/enter-server-urls-for-app-store-server-notifications/).
 Confirmar entrega de testes e eventos reais de assinatura nos dois ambientes,
 sem copiar payloads/JWS para logs ou relatórios. Um endpoint no código não prova

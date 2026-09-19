@@ -18,7 +18,7 @@ test -z "$(find "$app" -type d -name '*.appex' -print -quit)"
 test -z "$(unzip -Z1 "$ipa" | grep -E '(^|/)(PacketTunnel|DNSProxy|.*\.appex)(/|$)' || true)"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")" = "com.orbeworks.adless"
 test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessEnvironment' "$app/Info.plist")" = "production"
-test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessDNSCloudBaseURL' "$app/Info.plist")" = "https://adless-dns.adless-production.workers.dev"
+test "$(/usr/libexec/PlistBuddy -c 'Print :AdlessDNSCloudBaseURL' "$app/Info.plist")" = "https://adless-dns.orbeworks.workers.dev"
 if [ -n "${ADLESS_EXPECTED_BUILD_NUMBER:-}" ]; then
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Info.plist")" = "$ADLESS_EXPECTED_BUILD_NUMBER"
 fi

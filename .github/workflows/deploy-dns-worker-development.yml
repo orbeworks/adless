@@ -63,5 +63,5 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --retry 3 \
-            "https://adless-dns-development.adless-production.workers.dev/healthz" \
+            "https://adless-dns-development.orbeworks.workers.dev/healthz" \
             | python3 -c 'import json, sys; data=json.load(sys.stdin); assert data == {"status": "ok", "environment": "development"}, data'

@@ -3,7 +3,7 @@ set -eu
 
 expected_bundle_id=com.orbeworks.adless.dev
 expected_environment=development
-expected_worker_url=https://adless-dns-development.adless-production.workers.dev
+expected_worker_url=https://adless-dns-development.orbeworks.workers.dev
 scheme_name='Adless Dev'
 configuration_name='Debug Dev'
 
@@ -54,7 +54,7 @@ grep -Fqx "ADLESS_ENVIRONMENT = $expected_environment" "$source_configuration" \
   || fail "Development.xcconfig has the wrong environment"
 grep -Fqx "ADLESS_APP_BUNDLE_IDENTIFIER = $expected_bundle_id" "$source_configuration" \
   || fail "Development.xcconfig has the wrong bundle identifier"
-grep -Fqx "ADLESS_DNS_CLOUD_BASE_URL = https:/\$()/adless-dns-development.adless-production.workers.dev" "$source_configuration" \
+grep -Fqx "ADLESS_DNS_CLOUD_BASE_URL = https:/\$()/adless-dns-development.orbeworks.workers.dev" "$source_configuration" \
   || fail "Development.xcconfig does not point to the development Worker"
 
 requested_device="${1:-${ADLESS_IOS_DEVICE:-}}"
