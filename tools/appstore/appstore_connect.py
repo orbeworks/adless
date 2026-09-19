@@ -243,6 +243,51 @@ def marketing_version_tuple(value: str) -> tuple[int, int, int]:
     return tuple((components + [0, 0, 0])[:3])
 
 
+def marketing_version_string(value: tuple[int, int, int]) -> str:
+    return ".".join(str(part) for part in value)
+
+
+def command_next_marketing(client: Client, args: argparse.Namespace) -> None:
+    """Select an App Store version that is not closed for new builds."""
+
+    current = marketing_version_tuple(args.current_version)
+    versions = [
+        resource
+        for resource in client.all_resources(
+            f"/v1/apps/{urllib.parse.quote(args.app_id)}/appStoreVersions?limit=200"
+        )
+        if _attributes(resource).get("platform") == "IOS"
+    ]
+    closed_states = {
+        "READY_FOR_SALE",
+        "READY_FOR_DISTRIBUTION",
+        "REMOVED_FROM_SALE",
+        "DEVELOPER_REMOVED_FROM_SALE",
+        "PENDING_DEVELOPER_RELEASE",
+        "PENDING_APPLE_RELEASE",
+        "PROCESSING_FOR_APP_STORE",
+    }
+    closed_versions = [
+        marketing_version_tuple(str(_attributes(resource)["versionString"]))
+        for resource in versions
+        if _attributes(resource).get("appStoreState") in closed_states
+    ]
+    if closed_versions:
+        latest_closed = max(closed_versions)
+        next_after_closed = (latest_closed[0], latest_closed[1], latest_closed[2] + 1)
+    else:
+        next_after_closed = (0, 0, 0)
+    open_versions = [
+        marketing_version_tuple(str(_attributes(resource)["versionString"]))
+        for resource in versions
+        if _attributes(resource).get("appStoreState") not in closed_states
+    ]
+    selected = max(current, next_after_closed, *open_versions)
+    value = marketing_version_string(selected)
+    print(value)
+    write_output({"marketing_version": value})
+
+
 def require_internal_group(client: Client, app_id: str, group_id: str) -> None:
     group_path = f"/v1/betaGroups/{urllib.parse.quote(group_id, safe='')}"
     group = client.request("GET", group_path)["data"]
@@ -495,6 +540,10 @@ def build_parser() -> argparse.ArgumentParser:
     next_build.add_argument("--app-id", required=True)
     next_build.add_argument("--minimum", required=True, type=int)
 
+    next_marketing = subparsers.add_parser("next-marketing")
+    next_marketing.add_argument("--app-id", required=True)
+    next_marketing.add_argument("--current-version", required=True)
+
     testflight = subparsers.add_parser("testflight-preflight")
     testflight.add_argument("--app-id", required=True)
     testflight.add_argument("--version", required=True)
@@ -531,6 +580,8 @@ def main() -> int:
             command_preflight(client, args)
         elif args.command == "next-build":
             command_next_build(client, args)
+        elif args.command == "next-marketing":
+            command_next_marketing(client, args)
         elif args.command == "testflight-preflight":
             command_testflight_preflight(client, args)
         elif args.command == "wait-build":
