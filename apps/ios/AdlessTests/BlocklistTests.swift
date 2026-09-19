@@ -63,6 +63,43 @@ final class BlocklistTests: XCTestCase {
         XCTAssertFalse(SubscriptionAccessPolicy.allowsAccess(.inactive(at: now), at: now))
     }
 
+    func testSubscriptionAuthorizationUsesTheLongestVerifiedStoreStatus() throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let shorter = SubscriptionAuthorizationCandidate(
+            snapshot: SubscriptionAccessSnapshot(
+                isEntitled: true,
+                productID: SubscriptionConfiguration.monthlyProductID,
+                effectiveUntil: now.addingTimeInterval(60),
+                inGracePeriod: false,
+                lastVerifiedAt: now
+            ),
+            authorization: SubscriptionAuthorization(
+                transactionJWS: "shorter-jws",
+                transactionId: "1"
+            )
+        )
+        let longer = SubscriptionAuthorizationCandidate(
+            snapshot: SubscriptionAccessSnapshot(
+                isEntitled: true,
+                productID: SubscriptionConfiguration.yearlyProductID,
+                effectiveUntil: now.addingTimeInterval(120),
+                inGracePeriod: false,
+                lastVerifiedAt: now
+            ),
+            authorization: SubscriptionAuthorization(
+                transactionJWS: "longer-jws",
+                transactionId: "2"
+            )
+        )
+
+        let selected = try XCTUnwrap(
+            SubscriptionManager.preferredAuthorizationCandidate([shorter, longer])
+        )
+
+        XCTAssertEqual(selected.authorization, longer.authorization)
+        XCTAssertEqual(selected.snapshot, longer.snapshot)
+    }
+
     func testSubscriptionOfferFormatterUsesStoreKitPeriod() {
         XCTAssertEqual(
             SubscriptionOfferFormatter.freeTrialText(value: 7, unit: .day),

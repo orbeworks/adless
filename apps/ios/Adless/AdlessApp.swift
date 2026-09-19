@@ -4,6 +4,14 @@ import Foundation
 import UIKit
 import Sentry
 
+private enum SubscriptionActivationError: LocalizedError {
+    case verifiedTransactionUnavailable
+
+    var errorDescription: String? {
+        "A verified subscription transaction is unavailable"
+    }
+}
+
 @main
 struct AdlessApp: App {
     @StateObject private var viewModel = AppViewModel()
@@ -227,7 +235,10 @@ final class AppViewModel: ObservableObject {
 
         if authorizationRequired || !InstallationTokenStore.shared.hasAuthorizedCredentials() {
             guard let authorization = await subscriptionManager.currentEntitlementAuthorization() else {
-                subscriptionManager.showAuthorizationFailure()
+                AdlessSentry.capture(
+                    SubscriptionActivationError.verifiedTransactionUnavailable,
+                    operation: "subscription.authorization.current_entitlement"
+                )
                 return
             }
             await authorizeAndActivate(
@@ -435,7 +446,10 @@ final class AppViewModel: ObservableObject {
     private func ensureAuthorizationIfNeeded() async {
         guard hasSubscription, authorizationRequired || !InstallationTokenStore.shared.hasAuthorizedCredentials() else { return }
         guard let authorization = await subscriptionManager.currentEntitlementAuthorization() else {
-            subscriptionManager.showAuthorizationFailure()
+            AdlessSentry.capture(
+                SubscriptionActivationError.verifiedTransactionUnavailable,
+                operation: "subscription.authorization.current_entitlement"
+            )
             return
         }
         let previousDNSState = await dnsSettingsManager.currentState()
@@ -500,7 +514,6 @@ final class AppViewModel: ObservableObject {
             authorizationRequired = true
             isProtectionActive = false
             AdlessSentry.capture(error, operation: "subscription.authorization")
-            subscriptionManager.showAuthorizationFailure()
             if receivedCredentials, attempt?.isPendingRotation == true {
                 await removeStaleDNSAfterFailedCredentialCommit()
             }

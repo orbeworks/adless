@@ -236,17 +236,17 @@
     "Confirming DNS and Worker status." : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirming DNS and Worker status." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Confirmando o status do DNS e do Worker." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Confirmando el estado de DNS y del Worker." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Just a moment while we get everything ready for you." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Só um instante enquanto deixamos tudo pronto para você." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Un momento mientras preparamos todo para ti." } }
       }
     },
     "Adless could not confirm the Worker status." : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Adless could not confirm the Worker status." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Adless não conseguiu confirmar o status do Worker." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Adless no pudo confirmar el estado del Worker." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "We couldn't complete the connection. Try again in a moment." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não conseguimos concluir a conexão. Tente novamente em instantes." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No pudimos completar la conexión. Inténtalo de nuevo en unos instantes." } }
       }
     },
     "Preparing your protection..." : {
