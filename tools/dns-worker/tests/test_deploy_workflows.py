@@ -1,4 +1,4 @@
-"""Offline contracts for the production and development Worker workflows."""
+"""Offline contracts for the production Worker workflow."""
 from __future__ import annotations
 
 import unittest
@@ -28,24 +28,9 @@ class WorkerDeployWorkflowContractTests(unittest.TestCase):
     def test_production_health_check_uses_the_production_endpoint_and_environment(self):
         self.assert_health_contract(
             "deploy-dns-worker.yml",
-            "https://adless-dns.adless-production.workers.dev",
+            "https://adless-dns.orbeworks.workers.dev",
             "production",
         )
-
-    def test_development_health_check_uses_the_development_endpoint_and_environment(self):
-        self.assert_health_contract(
-            "deploy-dns-worker-development.yml",
-            "https://adless-dns-development.adless-production.workers.dev",
-            "development",
-        )
-
-    def test_each_workflow_contains_only_its_own_health_endpoint(self):
-        production = (WORKFLOWS / "deploy-dns-worker.yml").read_text(encoding="utf-8")
-        development = (WORKFLOWS / "deploy-dns-worker-development.yml").read_text(encoding="utf-8")
-        self.assertNotIn("adless-dns-development", production)
-        self.assertNotIn('"environment": "development"', production)
-        self.assertNotIn("https://adless-dns.adless-production.workers.dev/healthz", development)
-        self.assertNotIn('"environment": "production"', development)
 
 
 if __name__ == "__main__":

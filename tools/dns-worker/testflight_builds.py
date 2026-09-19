@@ -166,6 +166,11 @@ def main() -> int:
     add.add_argument("--build-number", required=True)
     merge = commands.add_parser("merge-for-deploy", help="Read-only union of published and local builds")
     merge.add_argument("--config", type=Path, required=True)
+    merge.add_argument(
+        "--print-builds",
+        action="store_true",
+        help="Print only the merged build list for non-GitHub deployment tooling",
+    )
     verify = commands.add_parser("verify", help="Read-only check after Worker deployment")
     verify.add_argument("--builds", required=True)
     args = parser.parse_args()
@@ -180,6 +185,9 @@ def main() -> int:
                 print("Existing production Worker access, policy, and binding names verified")
             elif args.command == "merge-for-deploy":
                 builds = merged_deploy_builds(settings, args.config)
+                if args.print_builds:
+                    print(builds)
+                    return 0
                 output = os.environ.get("GITHUB_OUTPUT")
                 if output:
                     with open(output, "a", encoding="utf-8") as handle:
