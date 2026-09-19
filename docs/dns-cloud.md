@@ -228,6 +228,12 @@ O Worker `adless-dns-development` é publicado pelo Cloudflare Workers Builds a
 partir da branch `develop`, com o ambiente Wrangler `development`. Ele não
 modifica o Worker de produção nem a allowlist de builds TestFlight.
 
+Para migrar também a produção para o Cloudflare Workers Builds, use
+[`tools/dns-worker/deploy-production.sh`](../tools/dns-worker/deploy-production.sh)
+como Deploy command. O script consulta e preserva a allowlist de builds
+TestFlight antes de publicar `adless-dns`; os Build secrets
+`CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` são obrigatórios.
+
 Após autorização explícita, revisão do diff, testes e conferência do alvo:
 
 ```sh

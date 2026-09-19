@@ -241,6 +241,14 @@ permissões da chave são **Pending** de verificação externa. Nunca mostrar
 conteúdo, JWT ou comandos com valores resolvidos. Não executar scripts de
 upload/submissão ou `-allowProvisioningUpdates` sem autorização para a ação.
 
+Após o archive/upload do TestFlight, o Xcode Cloud deve executar
+[`tools/appstore/authorize-testflight-build.sh`](../tools/appstore/authorize-testflight-build.sh)
+com `BUILD_NUMBER` definido para o `CFBundleVersion` do archive. O script espera
+o build ficar `VALID` na Apple e só então adiciona esse número à allowlist do
+Worker. Ele exige `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`,
+`CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` como secrets/variáveis do
+workflow do Xcode Cloud; não libera versões por curinga.
+
 ### Pendências verificadas em leitura (2026-09-04)
 
 - GitHub: os secrets ASC e Sentry estão cadastrados no repositório; os dois
