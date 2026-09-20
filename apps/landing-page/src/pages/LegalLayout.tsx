@@ -106,32 +106,26 @@ export default function LegalLayout({ page }: { page: LegalPageId }) {
           </div>
         </section>
         <div
-          className={`mx-auto max-w-6xl px-6 py-12 md:py-16 ${
-            page !== "support" ? "lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-16" : ""
-          }`}
+          className="mx-auto max-w-6xl px-6 py-12 md:py-16 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-16"
         >
-          {page !== "support" && (
-            <>
-              <details
-                key={`${language}-${page}`}
-                className="mb-10 rounded-2xl border border-border bg-card p-4 lg:hidden"
-              >
-                <summary className="cursor-pointer font-medium">{ui.contents}</summary>
-                <nav aria-label={ui.contents} className="mt-3">
-                  {links}
-                </nav>
-              </details>
-              <aside className="hidden lg:block">
-                <nav
-                  aria-label={ui.contents}
-                  className="sticky top-24 border-l border-border pl-3"
-                >
-                  <p className="px-3 pb-3 text-sm font-semibold">{ui.contents}</p>
-                  {links}
-                </nav>
-              </aside>
-            </>
-          )}
+          <details
+            key={`${language}-${page}`}
+            className="mb-10 rounded-2xl border border-border bg-card p-4 lg:hidden"
+          >
+            <summary className="cursor-pointer font-medium">{ui.contents}</summary>
+            <nav aria-label={ui.contents} className="mt-3">
+              {links}
+            </nav>
+          </details>
+          <aside className="hidden lg:block">
+            <nav
+              aria-label={ui.contents}
+              className="sticky top-24 border-l border-border pl-3"
+            >
+              <p className="px-3 pb-3 text-sm font-semibold">{ui.contents}</p>
+              {links}
+            </nav>
+          </aside>
           <article className={`min-w-0 ${page === "support" ? "mx-auto max-w-3xl" : ""}`}>
             {toc.map((section) => (
               <section
