@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Maintain only the existing production Worker's TestFlight app-version allowlist.
+"""Maintain only the existing production Worker's TestFlight build allowlist.
 
 No code upload, KV/DO access, route updates, or secret-value reads. Callers must
 serialize with Worker deployments using adless-dns-worker-production concurrency.
@@ -24,17 +24,17 @@ API_ROOT = "https://api.cloudflare.com/client/v4"
 
 def parse_builds(value: str) -> set[str]:
     if not isinstance(value, str) or len(value) > 4096:
-        raise ValueError("Invalid TestFlight app-version allowlist")
+        raise ValueError("Invalid TestFlight build allowlist")
     if not value.strip():
         return set()
     builds = {part.strip() for part in value.split(",")}
-    if any(not re.fullmatch(r"[1-9][0-9]{0,17}(?:\.[0-9]{1,18}){0,2}", part) for part in builds):
-        raise ValueError("TestFlight allowlist must contain explicit app version values only")
+    if any(not re.fullmatch(r"[1-9][0-9]{0,17}", part) for part in builds):
+        raise ValueError("TestFlight allowlist must contain explicit integer build numbers only")
     return builds
 
 
 def format_builds(builds: set[str]) -> str:
-    value = ",".join(sorted(builds, key=lambda value: tuple(int(part) for part in value.split("."))))
+    value = ",".join(sorted(builds, key=int))
     parse_builds(value)
     return value
 
@@ -69,12 +69,12 @@ def validated_bindings(settings: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return by_name
 
 
-def settings_patch(settings: dict[str, Any], app_version: str) -> tuple[dict[str, Any], str]:
-    new_version = parse_builds(app_version)
-    if len(new_version) != 1 or app_version not in new_version:
-        raise ValueError("Exactly one app version is required")
+def settings_patch(settings: dict[str, Any], build_number: str) -> tuple[dict[str, Any], str]:
+    new_build = parse_builds(build_number)
+    if len(new_build) != 1 or build_number not in new_build:
+        raise ValueError("Exactly one build number is required")
     bindings = validated_bindings(settings)
-    merged = format_builds(parse_builds(bindings[ALLOWLIST]["text"]) | new_version)
+    merged = format_builds(parse_builds(bindings[ALLOWLIST]["text"]) | new_build)
     # Inherit every other binding server-side, including opaque secret values.
     # https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/script_and_version_settings/methods/edit/
     patch = {"bindings": [
@@ -128,9 +128,9 @@ class CloudflareClient:
         return envelope["result"]
 
 
-def add_build(client: CloudflareClient, app_version: str) -> None:
+def add_build(client: CloudflareClient, build_number: str) -> None:
     before = client.request("GET")
-    patch, merged = settings_patch(before, app_version)
+    patch, merged = settings_patch(before, build_number)
     previous = validated_bindings(before)
     if parse_builds(previous[ALLOWLIST]["text"]) != parse_builds(merged):
         client.request("PATCH", patch)
@@ -142,7 +142,7 @@ def add_build(client: CloudflareClient, app_version: str) -> None:
         k: v for k, v in after.items() if k != ALLOWLIST
     }:
         raise RuntimeError("Worker bindings changed during allowlist update; stop distribution and inspect")
-    print(f"Confirmed TestFlight app version {app_version}; other Worker bindings preserved")
+    print(f"Confirmed TestFlight build {build_number}; other Worker bindings preserved")
 
 
 def merged_deploy_builds(settings: dict[str, Any], config_path: Path) -> str:
@@ -163,7 +163,7 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("check", help="Read-only validation of access and production bindings")
     add = commands.add_parser("add", help="Add one validated build; updates remote settings")
-    add.add_argument("--app-version", required=True)
+    add.add_argument("--build-number", required=True)
     merge = commands.add_parser("merge-for-deploy", help="Read-only union of published and local builds")
     merge.add_argument("--config", type=Path, required=True)
     merge.add_argument(
@@ -177,7 +177,7 @@ def main() -> int:
     try:
         client = CloudflareClient()
         if args.command == "add":
-            add_build(client, args.app_version)
+            add_build(client, args.build_number)
         else:
             settings = client.request("GET")
             bindings = validated_bindings(settings)

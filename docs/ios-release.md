@@ -72,9 +72,9 @@ estão no [README iOS](../apps/ios/README.md).
 
 O [wrangler.toml](../apps/dns-worker/wrangler.toml) local aceita Production
 normalmente; Sandbox depende de `AppTransaction` Apple-signed e da allowlist
-`APPLE_TESTFLIGHT_BUILD_VERSIONS`. Na verificação local essa lista contém `1.0.2`,
-mas o workflow escolhe a versão comercial dinamicamente. **Pending:** antes de testar
-uma nova versão, comparar a versão realmente enviada com a configuração remota
+`APPLE_TESTFLIGHT_BUILD_VERSIONS`. Na verificação local essa lista contém números
+explícitos de `CFBundleVersion`, incluindo `81`, e o workflow usa `BUILD_NUMBER`.
+**Pending:** antes de testar uma nova build, comparar o número realmente enviado com a configuração remota
 publicada e validar o gate; o workflow iOS não altera/publica o Worker. Mudar a
 allowlist ou publicar o Worker exige autorização explícita. Não abrir Sandbox
 indiscriminadamente para contornar erro. Evidências de download e allowlist não

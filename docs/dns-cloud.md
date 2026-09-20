@@ -128,7 +128,7 @@ arquivo. `workers.dev` usa hostname fornecido pela Cloudflare;
 | `APPLE_BUNDLE_ID`, `APPLE_APP_ID` | Identificadores esperados de app e notificações Apple; fonte canônica é o TOML |
 | `APPLE_ALLOWED_ENVIRONMENTS` | Localmente `Production` no registro normal |
 | `APPLE_NOTIFICATION_ENVIRONMENTS` | Localmente `Production,Sandbox` |
-| `APPLE_TESTFLIGHT_BUILD_VERSIONS` | Allowlist local da versão `1.0.2`; não comprova que essa versão foi carregada/aprovada no TestFlight |
+| `APPLE_TESTFLIGHT_BUILD_VERSIONS` | Allowlist local de números de build (`CFBundleVersion`); não comprova que uma build foi carregada/aprovada no TestFlight |
 | `XCODE_STOREKIT_CERTIFICATE_SHA256` | Somente no ambiente `development`; allowlist separada por vírgulas dos certificados ES256 presentes no `x5c` dos JWS StoreKit 2 do simulador e do aparelho físico. O certificado exportado por **Editor → Save Public Certificate** valida recibos locais e não deve ser presumido igual aos certificados dos JWS |
 
 O ambiente Wrangler `development` publica `adless-dns-development` e declara
@@ -138,7 +138,7 @@ Apple e TestFlight ficam desabilitados. O alvo top-level de produção conserva
 seus bindings, segredo, bundle e políticas Production/Sandbox.
 
 **Implemented (automação):** os uploads interno e externo de TestFlight a partir
-de `develop` adicionam a versão validada pela Apple à allowlist do Worker de produção,
+de `develop` adicionam o número da build validada pela Apple à allowlist do Worker de produção,
 via `tools/dns-worker/testflight_builds.py`. O PATCH modifica somente esse binding;
 os demais são herdados no servidor. Não faz deploy de código dessas branches,
 não abre Sandbox genericamente e não toca KV/DO ou rotas. O deploy de código

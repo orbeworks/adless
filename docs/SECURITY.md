@@ -81,7 +81,7 @@ O registro normal aceita Production conforme `APPLE_ALLOWED_ENVIRONMENTS`.
 Sandbox usa caminho próprio, independentemente de incluir Sandbox nessa
 variável: `validTestFlightAppTransaction` exige AppTransaction Apple com
 `receiptType=Sandbox`, bundle correspondente, mesmo `appTransactionId`,
-`appAppleId` ausente, data válida e versão do app em `APPLE_TESTFLIGHT_BUILD_VERSIONS`.
+`appAppleId` ausente, data válida e `CFBundleVersion` em `APPLE_TESTFLIGHT_BUILD_VERSIONS`.
 Isso limita o uso do JWS, mas não comprova criptograficamente que a execução
 veio de TestFlight. A Apple documenta que TestFlight usa Sandbox nas
 [notificações](https://developer.apple.com/documentation/appstoreservernotifications/environment).
