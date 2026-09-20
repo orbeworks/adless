@@ -817,12 +817,12 @@
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Activa la protección DNS en Ajustes" } }
       }
     },
-    "Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Network (or VPN & Device Management) → DNS → Adless. Return here; protection will be checked automatically." : {
+    "Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Device Management → DNS → Adless. Return here; protection will be checked automatically." : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Network (or VPN & Device Management) → DNS → Adless. Return here; protection will be checked automatically." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "A Apple não oferece um atalho público para DNS. Em Ajustes, volte à tela principal e siga Geral → VPN e Rede (ou VPN e Gerenciamento de Dispositivo) → DNS → Adless. Ao voltar, a proteção será verificada automaticamente." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Apple no ofrece un atajo público a DNS. En Ajustes, vuelve a la pantalla principal y sigue General → VPN y red (o VPN y gestión de dispositivos) → DNS → Adless. Al volver, la protección se comprobará automáticamente." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Device Management → DNS → Adless. Return here; protection will be checked automatically." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "A Apple não oferece um atalho público para DNS. Em Ajustes, volte à tela principal e siga Geral → Gestão de VPN e Dispositivo → DNS → Adless. Ao voltar, a proteção será verificada automaticamente." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Apple no ofrece un atajo público a DNS. En Ajustes, vuelve a la pantalla principal y sigue General → Gestión de VPN y dispositivos → DNS → Adless. Al volver, la protección se comprobará automáticamente." } }
       }
     },
     "Open Settings" : {

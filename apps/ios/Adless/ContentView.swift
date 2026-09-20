@@ -236,7 +236,7 @@ struct ContentView: View {
             }
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Network (or VPN & Device Management) → DNS → Adless. Return here; protection will be checked automatically.")
+            Text("Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Device Management → DNS → Adless. Return here; protection will be checked automatically.")
         }
         .alert("Disable Adless in Settings", isPresented: $viewModel.isManualDisableAlertPresented) {
             Button("Open Settings") {
