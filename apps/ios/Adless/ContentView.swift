@@ -6,11 +6,15 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @State private var subscriptionSheetHeight: CGFloat?
-    @State private var protectionStateAtTransitionStart = false
+    @State private var protectionStateAtLoadingStart = false
+
+    private var buttonIsLoading: Bool {
+        viewModel.isProtectionTransitioning || viewModel.isProtectionStateChecking
+    }
 
     private var buttonShowsActiveProtection: Bool {
-        viewModel.isProtectionTransitioning
-            ? protectionStateAtTransitionStart
+        buttonIsLoading
+            ? protectionStateAtLoadingStart
             : viewModel.isProtectionActive
     }
 
@@ -98,7 +102,7 @@ struct ContentView: View {
 
                 VStack(spacing: viewModel.hasAccess ? 24 : 16) {
                 Button {
-                    protectionStateAtTransitionStart = viewModel.isProtectionActive
+                    protectionStateAtLoadingStart = viewModel.isProtectionActive
                     Task { await viewModel.toggle() }
                 } label: {
                     ZStack {
@@ -108,7 +112,7 @@ struct ContentView: View {
                                              ? Color.white
                                              : inactiveButtonForeground)
 
-                        if viewModel.isProtectionTransitioning {
+                        if buttonIsLoading {
                             ProtectionProgressRing(
                                 color: buttonShowsActiveProtection
                                     ? .white
@@ -144,9 +148,11 @@ struct ContentView: View {
                         value: buttonShowsActiveProtection
                     )
                 }
-                .disabled(viewModel.isProtectionTransitioning)
-                .accessibilityLabel(viewModel.isProtectionTransitioning
-                                    ? "Updating protection"
+                .disabled(buttonIsLoading)
+                .accessibilityLabel(buttonIsLoading
+                                    ? (viewModel.isProtectionStateChecking
+                                       ? "Checking protection"
+                                       : "Updating protection")
                                     : (viewModel.hasAccess
                                        ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
                                        : "Subscribe to turn on blocking"))
@@ -251,6 +257,7 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, !viewModel.isPreparing else { return }
+            protectionStateAtLoadingStart = viewModel.isProtectionActive
             Task { await viewModel.applicationDidBecomeActive() }
         }
         .alert("Enable DNS protection in Settings", isPresented: $viewModel.isSystemApprovalAlertPresented) {
