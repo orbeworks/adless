@@ -139,6 +139,10 @@ struct ContentView: View {
                         x: 0,
                         y: buttonShowsActiveProtection && colorScheme == .dark ? 7 : 6
                     )
+                    .animation(
+                        .easeInOut(duration: 0.45),
+                        value: buttonShowsActiveProtection
+                    )
                 }
                 .disabled(viewModel.isProtectionTransitioning)
                 .accessibilityLabel(viewModel.isProtectionTransitioning
