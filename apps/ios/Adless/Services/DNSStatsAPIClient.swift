@@ -1,5 +1,49 @@
 import Foundation
 
+struct AccessPolicy: Decodable, Equatable, Sendable {
+    let subscriptionRequired: Bool
+}
+
+final class AccessPolicyAPIClient: @unchecked Sendable {
+    private let session: URLSession
+
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.urlCache = nil
+            configuration.httpCookieStorage = nil
+            configuration.urlCredentialStorage = nil
+            configuration.httpShouldSetCookies = false
+            configuration.waitsForConnectivity = false
+            configuration.timeoutIntervalForRequest = 4
+            configuration.timeoutIntervalForResource = 4
+            self.session = URLSession(configuration: configuration)
+        }
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+    }
+
+    func fetch() async throws -> AccessPolicy {
+        var request = URLRequest(url: DNSCloudConfiguration.accessPolicyURL)
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              data.count <= 4 * 1024,
+              let policy = try? JSONDecoder().decode(AccessPolicy.self, from: data) else {
+            throw DNSStatsAPIError.invalidResponse
+        }
+        return policy
+    }
+}
+
 struct DNSStatsResponse: Decodable, Equatable {
     let blockedTotal: Int
     let updatedAt: String
@@ -193,10 +237,11 @@ final class DNSAuthorizationAPIClient: @unchecked Sendable {
         appTransactionJWS: String?,
         installationId: String,
         rotationNonce: String,
-        currentCredentials: InstallationCredentials?
+        currentCredentials: InstallationCredentials?,
+        transactionIsRequired: Bool = true
     ) async throws -> InstallationCredentials {
         guard UUID(uuidString: installationId) != nil,
-              !transactionJWS.isEmpty,
+              transactionIsRequired ? !transactionJWS.isEmpty : transactionJWS.isEmpty,
               transactionJWS.utf8.count <= 128 * 1024,
               appTransactionJWS?.isEmpty != true,
               (appTransactionJWS?.utf8.count ?? 0) <= 128 * 1024,
@@ -251,6 +296,21 @@ final class DNSAuthorizationAPIClient: @unchecked Sendable {
             installationId: payload.installationId,
             dnsToken: payload.dnsToken,
             statsToken: payload.statsToken
+        )
+    }
+
+    func authorizeForDisabledSubscriptionRequirement(
+        installationId: String,
+        rotationNonce: String,
+        currentCredentials: InstallationCredentials?
+    ) async throws -> InstallationCredentials {
+        try await authorize(
+            transactionJWS: "",
+            appTransactionJWS: nil,
+            installationId: installationId,
+            rotationNonce: rotationNonce,
+            currentCredentials: currentCredentials,
+            transactionIsRequired: false
         )
     }
 }

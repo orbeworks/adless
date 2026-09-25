@@ -1,10 +1,18 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @State private var subscriptionSheetHeight: CGFloat?
+    @State private var protectionStateAtTransitionStart = false
+
+    private var buttonShowsActiveProtection: Bool {
+        viewModel.isProtectionTransitioning
+            ? protectionStateAtTransitionStart
+            : viewModel.isProtectionActive
+    }
 
     private var subscriptionDetent: PresentationDetent {
         guard let subscriptionSheetHeight else { return .medium }
@@ -88,50 +96,65 @@ struct ContentView: View {
                     }
                 }
 
-                VStack(spacing: viewModel.hasSubscription ? 24 : 16) {
+                VStack(spacing: viewModel.hasAccess ? 24 : 16) {
                 Button {
-                    if viewModel.hasSubscription {
-                        Task { await viewModel.toggle() }
-                    } else {
-                        viewModel.isSubscriptionPresented = true
-                    }
+                    protectionStateAtTransitionStart = viewModel.isProtectionActive
+                    Task { await viewModel.toggle() }
                 } label: {
-                    Image(systemName: "power")
-                        .font(.system(size: 56, weight: .medium))
-                        .frame(width: 144, height: 144)
-                        .foregroundStyle(viewModel.isProtectionActive
-                                         ? Color.white
-                                         : inactiveButtonForeground)
-                        .background(viewModel.isProtectionActive
-                                    ? activeButtonBackground
-                                    : inactiveButtonBackground)
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    viewModel.isProtectionActive
-                                        ? activeButtonBorder
-                                        : inactiveButtonBorder,
-                                    lineWidth: 1
-                                )
+                    ZStack {
+                        Image(systemName: "power")
+                            .font(.system(size: 56, weight: .medium))
+                            .foregroundStyle(buttonShowsActiveProtection
+                                             ? Color.white
+                                             : inactiveButtonForeground)
+
+                        if viewModel.isProtectionTransitioning {
+                            ProtectionProgressRing(
+                                color: buttonShowsActiveProtection
+                                    ? .white
+                                    : activeButtonBackground
+                            )
+                            .padding(8)
                         }
-                        .clipShape(Circle())
-                        .shadow(
-                            color: viewModel.isProtectionActive
-                                ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12)
-                                : Color.black.opacity(colorScheme == .dark ? 0.30 : 0.14),
-                            radius: viewModel.isProtectionActive && colorScheme == .dark ? 12 : 10,
-                            x: 0,
-                            y: viewModel.isProtectionActive && colorScheme == .dark ? 7 : 6
-                        )
+                    }
+                    .frame(width: 144, height: 144)
+                    .background(buttonShowsActiveProtection
+                                ? activeButtonBackground
+                                : inactiveButtonBackground)
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                buttonShowsActiveProtection
+                                    ? activeButtonBorder
+                                    : inactiveButtonBorder,
+                                lineWidth: 1
+                            )
+                    }
+                    .clipShape(Circle())
+                    .shadow(
+                        color: buttonShowsActiveProtection
+                            ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12)
+                            : Color.black.opacity(colorScheme == .dark ? 0.30 : 0.14),
+                        radius: buttonShowsActiveProtection && colorScheme == .dark ? 12 : 10,
+                        x: 0,
+                        y: buttonShowsActiveProtection && colorScheme == .dark ? 7 : 6
+                    )
+                    .animation(
+                        .easeInOut(duration: 0.45),
+                        value: buttonShowsActiveProtection
+                    )
                 }
-                .accessibilityLabel(viewModel.hasSubscription
-                                    ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
-                                    : "Subscribe to turn on blocking")
-                .accessibilityHint(viewModel.hasSubscription
+                .disabled(viewModel.isProtectionTransitioning)
+                .accessibilityLabel(viewModel.isProtectionTransitioning
+                                    ? "Updating protection"
+                                    : (viewModel.hasAccess
+                                       ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
+                                       : "Subscribe to turn on blocking"))
+                .accessibilityHint(viewModel.hasAccess
                                    ? "Turns DNS blocking on or off"
                                    : "Opens subscription options")
 
-                if !viewModel.hasSubscription {
+                if !viewModel.hasAccess {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
                             .font(.caption.weight(.medium))
@@ -147,7 +170,7 @@ struct ContentView: View {
                 }
                 }
 
-                if viewModel.hasSubscription {
+                if viewModel.hasAccess {
                     BlockingStatsView(
                         blockedTodayValue: viewModel.blockedTodayCount.formatted(.number),
                         allTimeValue: viewModel.allTimeBlockCount.formatted(.number)
@@ -155,7 +178,7 @@ struct ContentView: View {
                     .background(statsBackgroundStyle, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
 
-                if viewModel.hasSubscription {
+                if viewModel.hasAccess {
                     VStack(spacing: 4) {
                         Text(viewModel.isProtectionActive
                              ? "Browse cleaner. Stay private."
@@ -184,7 +207,7 @@ struct ContentView: View {
                         .padding(.top, 2)
                 }
 
-                if !viewModel.hasSubscription {
+                if !viewModel.hasAccess {
                     BlockingStatsView(
                         blockedTodayValue: viewModel.blockedTodayCount.formatted(.number),
                         allTimeValue: viewModel.allTimeBlockCount.formatted(.number)
@@ -199,7 +222,7 @@ struct ContentView: View {
             .padding(.horizontal, 32)
             .padding(.vertical)
 
-            if viewModel.isSubscriptionPresented {
+            if viewModel.isSubscriptionPresented && viewModel.isSubscriptionRequired {
                 ZStack {
                     Rectangle()
                         .fill(.ultraThinMaterial)
@@ -236,7 +259,7 @@ struct ContentView: View {
             }
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Network (or VPN & Device Management) → DNS → Adless. Return here; protection will be checked automatically.")
+            Text("Apple does not provide a public shortcut to DNS. In Settings, return to the main screen and follow General → VPN & Device Management → DNS → Adless. Return here; protection will be checked automatically.")
         }
         .alert("Disable Adless in Settings", isPresented: $viewModel.isManualDisableAlertPresented) {
             Button("Open Settings") {
@@ -248,7 +271,11 @@ struct ContentView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { viewModel.isSubscriptionPresented && !viewModel.isPreparing },
+                get: {
+                    viewModel.isSubscriptionPresented
+                        && viewModel.isSubscriptionRequired
+                        && !viewModel.isPreparing
+                },
                 set: { viewModel.isSubscriptionPresented = $0 }
             )
         ) {
@@ -269,6 +296,95 @@ struct ContentView: View {
                 .presentationBackground(AdlessTheme.subscriptionDrawerBackground)
                 .presentationBackgroundInteraction(.enabled)
         }
+    }
+}
+
+private struct ProtectionProgressRing: UIViewRepresentable {
+    let color: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeUIView(context: Context) -> SpinningRingView {
+        let view = SpinningRingView()
+        view.isAccessibilityElement = false
+        return view
+    }
+
+    func updateUIView(_ view: SpinningRingView, context: Context) {
+        view.update(color: UIColor(color), isAnimating: !reduceMotion)
+    }
+}
+
+private final class SpinningRingView: UIView {
+    private let trackLayer = CAShapeLayer()
+    private let progressLayer = CAShapeLayer()
+    private var shouldAnimate = true
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+
+        for shapeLayer in [trackLayer, progressLayer] {
+            shapeLayer.fillColor = UIColor.clear.cgColor
+            shapeLayer.lineWidth = 3
+            layer.addSublayer(shapeLayer)
+        }
+        progressLayer.lineCap = .round
+        progressLayer.strokeStart = 0.06
+        progressLayer.strokeEnd = 0.32
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let path = UIBezierPath(ovalIn: bounds.insetBy(dx: 1.5, dy: 1.5)).cgPath
+        trackLayer.frame = bounds
+        trackLayer.path = path
+        progressLayer.frame = bounds
+        progressLayer.path = path
+        CATransaction.commit()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateAnimation()
+    }
+
+    func update(color: UIColor, isAnimating: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackLayer.strokeColor = color.withAlphaComponent(0.16).cgColor
+        progressLayer.strokeColor = color.cgColor
+        CATransaction.commit()
+
+        shouldAnimate = isAnimating
+        updateAnimation()
+    }
+
+    private func updateAnimation() {
+        guard window != nil, shouldAnimate else {
+            progressLayer.removeAnimation(forKey: "continuousRotation")
+            return
+        }
+        guard progressLayer.animation(forKey: "continuousRotation") == nil else { return }
+
+        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotation.fromValue = 0
+        rotation.toValue = CGFloat.pi * 2
+        rotation.duration = 1.05
+        rotation.repeatCount = .infinity
+        rotation.timingFunction = CAMediaTimingFunction(name: .linear)
+        rotation.isRemovedOnCompletion = false
+        progressLayer.add(rotation, forKey: "continuousRotation")
     }
 }
 

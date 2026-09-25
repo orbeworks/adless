@@ -7,9 +7,10 @@ remota e [testes](TESTING.md) para cobertura e pendências.
 
 ## Limites de confiança
 
-**Implemented:** o iPhone apresenta uma transação StoreKit verificada e o Worker
-verifica novamente sua assinatura. O cliente não determina sozinho a validade
-da assinatura. O serviço não autentica identidade civil, conta própria ou posse
+**Implemented:** quando `subscriptionRequired=true`, o iPhone apresenta uma
+transação StoreKit verificada e o Worker verifica novamente sua assinatura.
+Quando o setting é `false`, o Worker pode emitir credenciais sem JWS; o cliente
+continua sem conceder acesso sozinho. O serviço não autentica identidade civil, conta própria ou posse
 exclusiva do Apple Account; `installationId` é UUID de instalação, não identidade
 de usuário. Não há App Attest no fluxo.
 
@@ -52,6 +53,13 @@ Nova transação requer nonce novo. O registro da instalação é gravado após
 mappings/claims/índices, como ponto de troca dos hashes correntes. Uma falha
 antes dessa troca preserva as credenciais anteriores.
 
+Quando a exigência de assinatura está desativada, o mesmo endpoint aceita JWS
+vazio e deriva um par separado por contexto. O registro schema v3 identifica
+`accessBasis=subscription-disabled`; rotação de um registro existente exige o
+par corrente, salvo retry idempotente do mesmo nonce. Ao reativar a exigência,
+DNS desses registros fica em pass-through e stats é negado. Credenciais de uma
+assinatura válida voltam a usar o registro schema v2 após reconciliação StoreKit.
+
 **Implemented:** mappings antigos não são removidos. Token DNS substituído
 continua conhecido em pass-through; seu par stats é negado. Isso preserva
 resolução após perda da resposta HTTP ou falha ao salvar credenciais no
@@ -81,7 +89,7 @@ O registro normal aceita Production conforme `APPLE_ALLOWED_ENVIRONMENTS`.
 Sandbox usa caminho próprio, independentemente de incluir Sandbox nessa
 variável: `validTestFlightAppTransaction` exige AppTransaction Apple com
 `receiptType=Sandbox`, bundle correspondente, mesmo `appTransactionId`,
-`appAppleId` ausente, data válida e build em `APPLE_TESTFLIGHT_BUILD_VERSIONS`.
+`appAppleId` ausente, data válida e `CFBundleVersion` em `APPLE_TESTFLIGHT_BUILD_VERSIONS`.
 Isso limita o uso do JWS, mas não comprova criptograficamente que a execução
 veio de TestFlight. A Apple documenta que TestFlight usa Sandbox nas
 [notificações](https://developer.apple.com/documentation/appstoreservernotifications/environment).
@@ -122,7 +130,7 @@ existente ou health 200 não prova a configuração do App Store Connect.
 | Local / fonte | Dados Implemented | Retenção e ressalva |
 | --- | --- | --- |
 | Keychain iOS / `InstallationTokenStore` | UUID, tokens DNS/stats, nonce e estado da autorização pendente/corrente | `AfterFirstUnlockThisDeviceOnly`; não prometer migração para outro aparelho nem apagar para contornar erro |
-| KV `AUTH`, `AuthorizationRecord` | UUID, hashes tokens/nonce, IDs Apple de assinatura/transação/último registro, produto, ambiente, estado, expiração, grace/retry, timestamps e clocks de transação/notificação | Registro schema v2; leitura/migração v1; sem TTL/rotina de limpeza nesses registros |
+| KV `AUTH`, registros de autorização | UUID e hashes tokens/nonce; schema v2 também contém IDs Apple, produto, ambiente, estado, expiração, grace/retry, timestamps e clocks | Assinatura usa schema v2 com leitura/migração v1; exigência desativada usa schema v3 sem IDs Apple; sem TTL/rotina de limpeza |
 | KV mappings/índices/claims | Hash token → UUID/papel; IDs Apple/ambiente → UUIDs; marcador de UUID de notificação | Apenas marcador tem TTL de 45 dias; mappings substituídos permanecem |
 | DO via `STATS` | `blockedTotal`, `updatedAt` e `blockingEnabled`, objeto nomeado por UUID da instalação | Sem histórico de domínio; preferência controla blocklist/pass-through; sem política de expurgo implementada |
 | DO via `AUTHORITY` | `authority:chain`, eventos imutáveis e `authority:latest`: IDs Apple, origem/reason, produto, ambiente, estado, período, grace/retry e datas | Nome do objeto usa hash do original transaction e ambiente; **conteúdo** conserva IDs Apple em claro; sem expurgo implementado |

@@ -21,6 +21,11 @@ struct SubscriptionAuthorization: Equatable, Sendable {
     let transactionId: String
 }
 
+struct SubscriptionAuthorizationCandidate: Equatable {
+    let snapshot: SubscriptionAccessSnapshot
+    let authorization: SubscriptionAuthorization
+}
+
 @MainActor
 final class SubscriptionManager: ObservableObject {
     @Published private(set) var products: [Product] = []
@@ -34,6 +39,7 @@ final class SubscriptionManager: ObservableObject {
 
     private let storage: SubscriptionStorage
     private var transactionUpdatesTask: Task<Void, Never>?
+    private var verifiedAuthorizationCandidate: SubscriptionAuthorizationCandidate?
 
     convenience init() {
         self.init(storage: SubscriptionStorage())
@@ -139,10 +145,6 @@ final class SubscriptionManager: ObservableObject {
         message = nil
     }
 
-    func showAuthorizationFailure() {
-        message = String(localized: "The subscription could not be authorized")
-    }
-
     private func loadProducts() async {
 #if DEBUG && os(iOS) && targetEnvironment(simulator)
         if !ProcessInfo.processInfo.arguments.contains("-useStoreKitProducts") {
@@ -244,7 +246,7 @@ final class SubscriptionManager: ObservableObject {
     private func refreshEntitlement() async {
         let previousAccess = hasActiveEntitlement
         let now = Date()
-        var candidates: [SubscriptionAccessSnapshot] = []
+        var candidates: [SubscriptionAuthorizationCandidate] = []
         var receivedStoreStatus = false
 
         let groupIDs = Set(products.compactMap { $0.subscription?.subscriptionGroupID })
@@ -252,23 +254,25 @@ final class SubscriptionManager: ObservableObject {
             do {
                 let statuses = try await Product.SubscriptionInfo.status(for: groupID)
                 receivedStoreStatus = true
-                candidates.append(contentsOf: statuses.compactMap { snapshot(from: $0, now: now) })
+                candidates.append(contentsOf: statuses.compactMap { candidate(from: $0, now: now) })
             } catch {
                 os_log("Subscription status refresh failed: %{public}@", log: .default, type: .error, error.localizedDescription)
             }
         }
 
-        if candidates.isEmpty, let current = await currentEntitlementSnapshot(at: now) {
+        if candidates.isEmpty, let current = await currentEntitlementCandidate(at: now) {
             candidates.append(current)
             receivedStoreStatus = true
         }
 
-        if let best = candidates.max(by: { ($0.effectiveUntil ?? .distantPast) < ($1.effectiveUntil ?? .distantPast) }) {
-            saveAndApply(best)
+        if let best = Self.preferredAuthorizationCandidate(candidates) {
+            verifiedAuthorizationCandidate = best
+            saveAndApply(best.snapshot)
         } else if !receivedStoreStatus, hasValidCachedEntitlement() {
             // Keep the last verified entitlement during a temporary offline period.
             applyCachedState()
         } else {
+            verifiedAuthorizationCandidate = nil
             let inactive = SubscriptionAccessSnapshot.inactive(at: now)
             try? storage.save(inactive)
             state = products.isEmpty ? .unavailable : .inactive
@@ -276,7 +280,10 @@ final class SubscriptionManager: ObservableObject {
         }
     }
 
-    private func snapshot(from status: Product.SubscriptionInfo.Status, now: Date) -> SubscriptionAccessSnapshot? {
+    private func candidate(
+        from status: Product.SubscriptionInfo.Status,
+        now: Date
+    ) -> SubscriptionAuthorizationCandidate? {
         guard status.state == .subscribed || status.state == .inGracePeriod,
               case .verified(let transaction) = status.transaction,
               SubscriptionConfiguration.productIDs.contains(transaction.productID),
@@ -293,16 +300,22 @@ final class SubscriptionManager: ObservableObject {
         }
 
         guard let effectiveUntil, effectiveUntil > now else { return nil }
-        return SubscriptionAccessSnapshot(
-            isEntitled: true,
-            productID: transaction.productID,
-            effectiveUntil: effectiveUntil,
-            inGracePeriod: status.state == .inGracePeriod,
-            lastVerifiedAt: now
+        return SubscriptionAuthorizationCandidate(
+            snapshot: SubscriptionAccessSnapshot(
+                isEntitled: true,
+                productID: transaction.productID,
+                effectiveUntil: effectiveUntil,
+                inGracePeriod: status.state == .inGracePeriod,
+                lastVerifiedAt: now
+            ),
+            authorization: SubscriptionAuthorization(
+                transactionJWS: status.transaction.jwsRepresentation,
+                transactionId: String(transaction.id)
+            )
         )
     }
 
-    private func currentEntitlementSnapshot(at now: Date) async -> SubscriptionAccessSnapshot? {
+    private func currentEntitlementCandidate(at now: Date) async -> SubscriptionAuthorizationCandidate? {
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
                   SubscriptionConfiguration.productIDs.contains(transaction.productID),
@@ -310,30 +323,43 @@ final class SubscriptionManager: ObservableObject {
                   let expirationDate = transaction.expirationDate,
                   expirationDate > now else { continue }
 
-            return SubscriptionAccessSnapshot(
-                isEntitled: true,
-                productID: transaction.productID,
-                effectiveUntil: expirationDate,
-                inGracePeriod: false,
-                lastVerifiedAt: now
+            return SubscriptionAuthorizationCandidate(
+                snapshot: SubscriptionAccessSnapshot(
+                    isEntitled: true,
+                    productID: transaction.productID,
+                    effectiveUntil: expirationDate,
+                    inGracePeriod: false,
+                    lastVerifiedAt: now
+                ),
+                authorization: SubscriptionAuthorization(
+                    transactionJWS: result.jwsRepresentation,
+                    transactionId: String(transaction.id)
+                )
             )
         }
         return nil
     }
 
     func currentEntitlementAuthorization() async -> SubscriptionAuthorization? {
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  SubscriptionConfiguration.productIDs.contains(transaction.productID),
-                  transaction.revocationDate == nil,
-                  let expirationDate = transaction.expirationDate,
-                  expirationDate > Date() else { continue }
-            return SubscriptionAuthorization(
-                transactionJWS: result.jwsRepresentation,
-                transactionId: String(transaction.id)
-            )
+        let now = Date()
+        if let candidate = verifiedAuthorizationCandidate,
+           SubscriptionAccessPolicy.allowsAccess(candidate.snapshot, at: now) {
+            return candidate.authorization
+        }
+        if let candidate = await currentEntitlementCandidate(at: now) {
+            verifiedAuthorizationCandidate = candidate
+            return candidate.authorization
         }
         return nil
+    }
+
+    static func preferredAuthorizationCandidate(
+        _ candidates: [SubscriptionAuthorizationCandidate]
+    ) -> SubscriptionAuthorizationCandidate? {
+        candidates.max {
+            ($0.snapshot.effectiveUntil ?? .distantPast)
+                < ($1.snapshot.effectiveUntil ?? .distantPast)
+        }
     }
 
     func currentEntitlementJWS() async -> String? {

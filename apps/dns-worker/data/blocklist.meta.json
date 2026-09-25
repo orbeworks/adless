@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "version": "v5dbb3cb38746f6b6",
-  "domainCount": 63376,
-  "textSHA256": "5dbb3cb38746f6b6a98779d39b295e177952f187b6f3bcbb1449886f109a6027",
-  "sourceSHA256": "db76d6bca779bb00105e6abfd636f1134a4dae06eb9369f05333a90521f0e0fa",
-  "uncompressedSizeBytes": 1223391
+  "version": "vb99e1b2f1dfc97f7",
+  "domainCount": 55799,
+  "textSHA256": "b99e1b2f1dfc97f7dc97be6cb7e842a70d64fce4082143bb1c44cc573d7fc1df",
+  "sourceSHA256": "3654dd815a01cfe3eca5bfb3a45e341e74c1ecc61af65b07e1e49a8c5225be1a",
+  "uncompressedSizeBytes": 1085223
 }

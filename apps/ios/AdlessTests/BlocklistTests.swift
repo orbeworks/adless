@@ -4,6 +4,21 @@ import XCTest
 
 @MainActor
 final class BlocklistTests: XCTestCase {
+    func testAccessPolicyRequiresSubscriptionOnlyWhenConfigured() {
+        XCTAssertFalse(AppViewModel.accessIsGranted(
+            subscriptionRequired: true,
+            hasSubscription: false
+        ))
+        XCTAssertTrue(AppViewModel.accessIsGranted(
+            subscriptionRequired: true,
+            hasSubscription: true
+        ))
+        XCTAssertTrue(AppViewModel.accessIsGranted(
+            subscriptionRequired: false,
+            hasSubscription: false
+        ))
+    }
+
     func testSentryDoesNotStartInsideXCTest() {
         XCTAssertFalse(AdlessSentry.shouldStart(environment: ProcessInfo.processInfo.environment))
         XCTAssertFalse(AdlessSentry.shouldStart(environment: [
@@ -61,6 +76,43 @@ final class BlocklistTests: XCTestCase {
         XCTAssertTrue(SubscriptionAccessPolicy.allowsAccess(grace, at: now))
         XCTAssertFalse(SubscriptionAccessPolicy.allowsAccess(active, at: now.addingTimeInterval(60)))
         XCTAssertFalse(SubscriptionAccessPolicy.allowsAccess(.inactive(at: now), at: now))
+    }
+
+    func testSubscriptionAuthorizationUsesTheLongestVerifiedStoreStatus() throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let shorter = SubscriptionAuthorizationCandidate(
+            snapshot: SubscriptionAccessSnapshot(
+                isEntitled: true,
+                productID: SubscriptionConfiguration.monthlyProductID,
+                effectiveUntil: now.addingTimeInterval(60),
+                inGracePeriod: false,
+                lastVerifiedAt: now
+            ),
+            authorization: SubscriptionAuthorization(
+                transactionJWS: "shorter-jws",
+                transactionId: "1"
+            )
+        )
+        let longer = SubscriptionAuthorizationCandidate(
+            snapshot: SubscriptionAccessSnapshot(
+                isEntitled: true,
+                productID: SubscriptionConfiguration.yearlyProductID,
+                effectiveUntil: now.addingTimeInterval(120),
+                inGracePeriod: false,
+                lastVerifiedAt: now
+            ),
+            authorization: SubscriptionAuthorization(
+                transactionJWS: "longer-jws",
+                transactionId: "2"
+            )
+        )
+
+        let selected = try XCTUnwrap(
+            SubscriptionManager.preferredAuthorizationCandidate([shorter, longer])
+        )
+
+        XCTAssertEqual(selected.authorization, longer.authorization)
+        XCTAssertEqual(selected.snapshot, longer.snapshot)
     }
 
     func testSubscriptionOfferFormatterUsesStoreKitPeriod() {
@@ -159,6 +211,7 @@ final class BlocklistTests: XCTestCase {
         XCTAssertFalse(DNSCloudConfiguration.isAdlessEndpoint(URL(string: "https://adless-dns.orbeworks.workers.dev/v1/stats")!))
         XCTAssertTrue(InstallationTokenStore.isValid(token))
         XCTAssertFalse(InstallationTokenStore.isValid(String(repeating: "A", count: 42)))
+        XCTAssertEqual(DNSCloudConfiguration.accessPolicyURL.path, "/v1/access-policy")
     }
 
     func testFailedDNSRemovalExplainsManualSettingsFallback() {
@@ -198,6 +251,21 @@ final class BlocklistTests: XCTestCase {
         XCTAssertNil(payload["appTransactionJWS"])
         XCTAssertEqual(payload["currentDnsToken"], String(repeating: "D", count: 43))
         XCTAssertEqual(payload["currentStatsToken"], String(repeating: "S", count: 43))
+    }
+
+    func testAuthorizationPayloadSupportsDisabledSubscriptionRequirement() throws {
+        let data = try JSONEncoder().encode(DNSAuthorizationRequest(
+            installationId: "11111111-1111-4111-8111-111111111111",
+            transactionJWS: "",
+            appTransactionJWS: nil,
+            rotationNonce: String(repeating: "N", count: 43),
+            currentDnsToken: nil,
+            currentStatsToken: nil
+        ))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+
+        XCTAssertEqual(payload["transactionJWS"], "")
+        XCTAssertNil(payload["appTransactionJWS"])
     }
 
     func testRestoreAlwaysReconcilesExistingCredentialsWithTheWorker() {

@@ -18,15 +18,12 @@ ficam em [dns-cloud](docs/dns-cloud.md) e [ios-release](docs/ios-release.md).
 
 | Branch | Finalidade | Destino |
 | --- | --- | --- |
-| `develop` | Desenvolvimento isolado com o app `Adless Dev`, StoreKit local no Xcode e Worker `adless-dns-development` | Aparelhos/simuladores de desenvolvimento; não distribui pelo TestFlight |
-| `beta` | Validação do app oficial `Adless` | Dois workflows separados do Xcode Cloud: TestFlight Internal e TestFlight External |
+| `develop` | Desenvolvimento e validação do app oficial/Dev, conforme o workflow escolhido | Worker Dev no Xcode e TestFlight |
 | `main` | Produção do app oficial e dos serviços públicos | App Store e Worker de produção |
 
-A promoção esperada é `develop` → `beta` → `main`. Os dois workflows da
-`beta` partem da mesma branch, mas mantêm separadas as distribuições interna e
-externa. Pushes em `develop` abrem uma PR para `beta` quando ainda não existe
-uma aberta; pushes em `beta` fazem o mesmo para `main`. Essas automações nunca
-executam o merge. Veja [Desenvolvimento](docs/DEVELOPMENT.md) e
+A promoção esperada é `develop` → `main`. Pushes em `develop` abrem uma PR
+para `main` quando ainda não existe uma aberta; a automação nunca executa o
+merge. Veja [Desenvolvimento](docs/DEVELOPMENT.md) e
 [Apple e lançamento](docs/ios-release.md).
 
 ## Comece aqui

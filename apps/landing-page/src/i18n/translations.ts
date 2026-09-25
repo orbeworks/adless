@@ -70,7 +70,7 @@ export const legalDocuments: Record<
           steps: [
             "Make sure the subscription is active in your Apple Account.",
             "Open Adless and tap the main button to enable protection.",
-            "Open Settings → General → VPN & Network → DNS and enable the Adless DNS configuration if iOS asks for approval.",
+            "Open Settings → General → VPN & Device Management → DNS and enable the Adless DNS configuration if iOS asks for approval.",
             "When a network changes, iOS applies the saved DNS configuration when it remains available.",
           ],
           title: "Before contacting support",
@@ -205,7 +205,7 @@ export const legalDocuments: Record<
           steps: [
             "Verifique se a assinatura está ativa na sua Conta Apple.",
             "Abra o Adless e toque no botão principal para ativar a proteção.",
-            "Abra Ajustes → Geral → VPN e Rede → DNS e ative a configuração DNS do Adless se o iOS solicitar aprovação.",
+            "Abra Ajustes → Geral → Gestão de VPN e Dispositivo → DNS e ative a configuração DNS do Adless se o iOS solicitar aprovação.",
             "Quando a rede muda, o iOS aplica a configuração DNS salva enquanto ela permanece disponível.",
           ],
         },
@@ -309,7 +309,7 @@ export const legalDocuments: Record<
           steps: [
             "Comprueba que la suscripción esté activa en tu Cuenta de Apple.",
             "Abre Adless y toca el botón principal para activar la protección.",
-            "Abre Ajustes → General → VPN y Red → DNS y activa la configuración DNS de Adless si iOS solicita aprobación.",
+            "Abre Ajustes → General → Gestión de VPN y dispositivos → DNS y activa la configuración DNS de Adless si iOS solicita aprobación.",
             "Cuando cambia la red, iOS aplica la configuración DNS guardada mientras siga disponible.",
           ],
         },

@@ -1,4 +1,4 @@
-name: Open develop to beta PR
+name: Open develop to main PR
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - develop
 
 concurrency:
-  group: open-develop-to-beta-pr
+  group: open-develop-to-main-pr
   cancel-in-progress: false
 
 permissions:
@@ -26,27 +26,27 @@ jobs:
 
           existing_pr="$(gh pr list \
             --repo "$GITHUB_REPOSITORY" \
-            --base beta \
+            --base main \
             --head develop \
             --state open \
             --json number \
             --jq '.[0].number // empty')"
           if [ -n "$existing_pr" ]; then
-            echo "PR #$existing_pr from develop to beta is already open."
+            echo "PR #$existing_pr from develop to main is already open."
             exit 0
           fi
 
           ahead_by="$(gh api \
-            "repos/$GITHUB_REPOSITORY/compare/beta...develop" \
+            "repos/$GITHUB_REPOSITORY/compare/main...develop" \
             --jq '.ahead_by')"
           if [ "$ahead_by" -eq 0 ]; then
-            echo "develop has no commits pending in beta."
+            echo "develop has no commits pending in main."
             exit 0
           fi
 
           gh pr create \
             --repo "$GITHUB_REPOSITORY" \
-            --base beta \
+            --base main \
             --head develop \
-            --title "Promote develop to beta" \
-            --body "Automated promotion PR from develop to beta. Review is required; this workflow never merges the PR."
+            --title "Promote develop to main" \
+            --body "Automated promotion PR from develop to main. Review is required; this workflow never merges the PR."

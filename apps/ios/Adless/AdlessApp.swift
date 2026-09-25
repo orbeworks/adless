@@ -4,6 +4,14 @@ import Foundation
 import UIKit
 import Sentry
 
+private enum SubscriptionActivationError: LocalizedError {
+    case verifiedTransactionUnavailable
+
+    var errorDescription: String? {
+        "A verified subscription transaction is unavailable"
+    }
+}
+
 @main
 struct AdlessApp: App {
     @StateObject private var viewModel = AppViewModel()
@@ -21,6 +29,10 @@ struct AdlessApp: App {
 
 @MainActor
 final class AppViewModel: ObservableObject {
+    static func accessIsGranted(subscriptionRequired: Bool, hasSubscription: Bool) -> Bool {
+        !subscriptionRequired || hasSubscription
+    }
+
     static func authorizationIsRequired(
         hasAccess: Bool,
         hasCredentials: Bool,
@@ -57,17 +69,26 @@ final class AppViewModel: ObservableObject {
     @Published var statusText: String = String(localized: "Off")
     @Published private(set) var isPreparing = true
     @Published private(set) var hasSubscription = false
+    @Published private(set) var isSubscriptionRequired = true
     @Published private(set) var remoteBlockingState: RemoteBlockingState = .unknown
     @Published private(set) var isProtectionStateChecking = false
+    @Published private(set) var isProtectionTransitioning = false
     @Published var isSubscriptionPresented = false
     @Published var isSystemApprovalAlertPresented = false
     @Published var isManualDisableAlertPresented = false
     @Published private(set) var blockedTodayCount = 0
     @Published private(set) var allTimeBlockCount = 0
 
+    var hasAccess: Bool {
+        Self.accessIsGranted(
+            subscriptionRequired: isSubscriptionRequired,
+            hasSubscription: hasSubscription
+        )
+    }
+
     var protectionHeadline: String {
         if isProtectionActive { return String(localized: "Protection Active") }
-        guard hasSubscription, isOn, remoteBlockingState == .unknown else {
+        guard hasAccess, isOn, remoteBlockingState == .unknown else {
             return String(localized: "Protection Off")
         }
         return isProtectionStateChecking
@@ -76,7 +97,7 @@ final class AppViewModel: ObservableObject {
     }
 
     var protectionSummary: String {
-        if !hasSubscription {
+        if !hasAccess {
             return String(localized: "Block ads and trackers across your iPhone.")
         }
         if isProtectionActive {
@@ -97,6 +118,7 @@ final class AppViewModel: ObservableObject {
     private let statsAPIClient = DNSStatsAPIClient()
     private let blockingAPIClient = DNSBlockingAPIClient()
     private let authorizationAPIClient = DNSAuthorizationAPIClient()
+    private let accessPolicyAPIClient = AccessPolicyAPIClient()
     private let protectionStateReconciler = ProtectionStateReconciler()
     private var dnsSettingsObserver: NSObjectProtocol?
     private var isAuthorizing = false
@@ -108,24 +130,24 @@ final class AppViewModel: ObservableObject {
             guard let self else { return }
             self.hasSubscription = hasAccess
             self.authorizationRequired = Self.authorizationIsRequired(
-                hasAccess: hasAccess,
+                hasAccess: self.hasAccess,
                 hasCredentials: InstallationTokenStore.shared.hasAuthorizedCredentials()
             )
-            if self.authorizationRequired || !hasAccess {
+            if self.authorizationRequired || !self.hasAccess {
                 self.isProtectionActive = false
             }
             // The initial foreground pass performs this reconciliation itself.
             // Avoid racing it with the entitlement callback while startup state
             // is still being established.
             guard !self.needsStartupAuthorizationReconciliation else { return }
-            if hasAccess {
+            if self.hasAccess {
                 Task { @MainActor [weak self] in
                     await self?.ensureAuthorizationIfNeeded()
                 }
                 return
             }
             Task { @MainActor [weak self] in
-                await self?.disableIfSubscriptionExpired()
+                await self?.disableIfAccessUnavailable()
             }
         }
         subscriptionManager.onPurchaseCompleted = { [weak self] authorization, source in
@@ -183,11 +205,17 @@ final class AppViewModel: ObservableObject {
 
     @MainActor
     func toggle() async {
-        guard !isPreparing else { return }
-        guard hasSubscription else {
-            isSubscriptionPresented = true
-            return
+        guard !isPreparing, !isProtectionTransitioning else { return }
+        if !hasAccess {
+            await refreshAccessPolicy()
+            guard hasAccess else {
+                isSubscriptionPresented = true
+                return
+            }
         }
+
+        isProtectionTransitioning = true
+        defer { isProtectionTransitioning = false }
 
         if isProtectionActive {
             let transaction = AdlessSentry.startTransaction(name: "protection.deactivate", operation: "blocking-preference")
@@ -219,15 +247,26 @@ final class AppViewModel: ObservableObject {
         enableBlocking: Bool
     ) async {
         guard allowDuringPreparation || !isPreparing else { return }
-        guard hasSubscription else {
+        guard hasAccess else {
             isSubscriptionPresented = true
             return
         }
         invalidateProtectionStateForReconciliation()
 
         if authorizationRequired || !InstallationTokenStore.shared.hasAuthorizedCredentials() {
+            if !isSubscriptionRequired {
+                await authorizeWithDisabledSubscriptionRequirement(
+                    shouldActivateAfterAuthorization: true,
+                    allowActivationDuringPreparation: allowDuringPreparation,
+                    enableBlockingAfterAuthorization: enableBlocking
+                )
+                return
+            }
             guard let authorization = await subscriptionManager.currentEntitlementAuthorization() else {
-                subscriptionManager.showAuthorizationFailure()
+                AdlessSentry.capture(
+                    SubscriptionActivationError.verifiedTransactionUnavailable,
+                    operation: "subscription.authorization.current_entitlement"
+                )
                 return
             }
             await authorizeAndActivate(
@@ -330,7 +369,7 @@ final class AppViewModel: ObservableObject {
 
     private var protectionReconciliationRequirements: ProtectionReconciliationRequirements {
         ProtectionReconciliationRequirements(
-            hasAccess: hasSubscription,
+            hasAccess: hasAccess,
             hasCredentials: InstallationTokenStore.shared.hasAuthorizedCredentials(),
             authorizationRequired: authorizationRequired
         )
@@ -356,7 +395,7 @@ final class AppViewModel: ObservableObject {
 
         isOn = state.isSystemEnabled
         isProtectionActive = Self.protectionIsConfirmed(
-            hasAccess: hasSubscription,
+            hasAccess: hasAccess,
             hasCredentials: InstallationTokenStore.shared.hasAuthorizedCredentials(),
             authorizationRequired: authorizationRequired,
             remoteBlockingState: snapshot.remoteBlockingState,
@@ -367,7 +406,7 @@ final class AppViewModel: ObservableObject {
         }
         AdlessSentry.event("dns.settings.status_change", state: state.rawValue)
 
-        if !hasSubscription {
+        if !hasAccess {
             statusText = String(localized: "Premium access required")
             return
         }
@@ -403,15 +442,17 @@ final class AppViewModel: ObservableObject {
     @MainActor
     func applicationDidBecomeActive() async {
         invalidateProtectionStateForReconciliation()
+        await refreshAccessPolicy()
         await subscriptionManager.loadAndRefresh()
         hasSubscription = subscriptionManager.hasActiveEntitlement
-        if needsStartupAuthorizationReconciliation, hasSubscription {
-            authorizationRequired = true
+        if needsStartupAuthorizationReconciliation, hasAccess {
+            authorizationRequired = isSubscriptionRequired
+                || !InstallationTokenStore.shared.hasAuthorizedCredentials()
             isProtectionActive = false
         }
         needsStartupAuthorizationReconciliation = false
         await ensureAuthorizationIfNeeded()
-        await disableIfSubscriptionExpired()
+        await disableIfAccessUnavailable()
         await reconcileProtectionState()
         refreshBlockingStats()
         await refreshCloudStats()
@@ -433,9 +474,24 @@ final class AppViewModel: ObservableObject {
     }
 
     private func ensureAuthorizationIfNeeded() async {
-        guard hasSubscription, authorizationRequired || !InstallationTokenStore.shared.hasAuthorizedCredentials() else { return }
+        guard hasAccess, authorizationRequired || !InstallationTokenStore.shared.hasAuthorizedCredentials() else { return }
+        if !isSubscriptionRequired {
+            let previousDNSState = await dnsSettingsManager.currentState()
+            await authorizeWithDisabledSubscriptionRequirement(
+                shouldActivateAfterAuthorization: Self.shouldActivateAfterAuthorization(
+                    explicitlyRequested: false,
+                    previousDNSState: previousDNSState
+                ),
+                allowActivationDuringPreparation: isPreparing,
+                enableBlockingAfterAuthorization: false
+            )
+            return
+        }
         guard let authorization = await subscriptionManager.currentEntitlementAuthorization() else {
-            subscriptionManager.showAuthorizationFailure()
+            AdlessSentry.capture(
+                SubscriptionActivationError.verifiedTransactionUnavailable,
+                operation: "subscription.authorization.current_entitlement"
+            )
             return
         }
         let previousDNSState = await dnsSettingsManager.currentState()
@@ -452,13 +508,74 @@ final class AppViewModel: ObservableObject {
         )
     }
 
+    private func authorizeWithDisabledSubscriptionRequirement(
+        shouldActivateAfterAuthorization: Bool,
+        allowActivationDuringPreparation: Bool,
+        enableBlockingAfterAuthorization: Bool
+    ) async {
+        guard !isSubscriptionRequired, !isAuthorizing else { return }
+        isAuthorizing = true
+        defer { isAuthorizing = false }
+        authorizationRequired = true
+        isProtectionActive = false
+        statusText = String(localized: "Authorizing")
+        var receivedCredentials = false
+        var attempt: InstallationAuthorizationAttempt?
+        do {
+            let installationId = try InstallationTokenStore.shared.installationID()
+            let preparedAttempt = try InstallationTokenStore.shared.authorizationAttempt(transactionId: "0")
+            attempt = preparedAttempt
+            let credentials = try await authorizationAPIClient.authorizeForDisabledSubscriptionRequirement(
+                installationId: installationId,
+                rotationNonce: preparedAttempt.rotationNonce,
+                currentCredentials: preparedAttempt.currentCredentials
+            )
+            receivedCredentials = true
+            try InstallationTokenStore.shared.commit(
+                credentials,
+                transactionId: "0",
+                rotationNonce: preparedAttempt.rotationNonce
+            )
+            authorizationRequired = false
+            isSubscriptionPresented = false
+            if shouldActivateAfterAuthorization {
+                await activateProtection(
+                    allowDuringPreparation: allowActivationDuringPreparation,
+                    enableBlocking: enableBlockingAfterAuthorization
+                )
+            } else {
+                await reconcileProtectionState()
+            }
+        } catch {
+            authorizationRequired = true
+            isProtectionActive = false
+            AdlessSentry.capture(error, operation: "access_policy.authorization")
+            if receivedCredentials, attempt?.isPendingRotation == true {
+                await removeStaleDNSAfterFailedCredentialCommit()
+            }
+            await reconcileProtectionState()
+        }
+    }
+
+    private func refreshAccessPolicy() async {
+        do {
+            isSubscriptionRequired = try await accessPolicyAPIClient.fetch().subscriptionRequired
+        } catch {
+            isSubscriptionRequired = true
+            AdlessSentry.capture(error, operation: "access_policy.fetch")
+        }
+        if !isSubscriptionRequired {
+            isSubscriptionPresented = false
+        }
+    }
+
     private func authorizeAndActivate(
         _ authorization: SubscriptionAuthorization,
         shouldActivateAfterAuthorization: Bool,
         allowActivationDuringPreparation: Bool = false,
         enableBlockingAfterAuthorization: Bool = true
     ) async {
-        guard hasSubscription, !isAuthorizing else { return }
+        guard hasAccess, !isAuthorizing else { return }
         isAuthorizing = true
         defer { isAuthorizing = false }
         authorizationRequired = true
@@ -500,7 +617,6 @@ final class AppViewModel: ObservableObject {
             authorizationRequired = true
             isProtectionActive = false
             AdlessSentry.capture(error, operation: "subscription.authorization")
-            subscriptionManager.showAuthorizationFailure()
             if receivedCredentials, attempt?.isPendingRotation == true {
                 await removeStaleDNSAfterFailedCredentialCommit()
             }
@@ -547,8 +663,8 @@ final class AppViewModel: ObservableObject {
     }
 
     @MainActor
-    private func disableIfSubscriptionExpired() async {
-        guard !hasSubscription else { return }
+    private func disableIfAccessUnavailable() async {
+        guard !hasAccess else { return }
         // The Worker already turns an expired known credential into DNS
         // pass-through. Keep the system DNS profile intact so renewed access
         // does not require another trip to Settings.

@@ -31,8 +31,8 @@ def settings():
 class BuildAllowlistTests(unittest.TestCase):
     def test_only_explicit_build_numbers(self):
         self.assertEqual(builds.parse_builds("2,6,2"), {"2", "6"})
-        self.assertEqual(builds.format_builds({"10", "2"}), "2,10")
-        for value in ("*", "2,*", "0", "02", "-1", "6\nEVIL=1", "1.0", ",", "1,", "1" * 4097, None):
+        self.assertEqual(builds.format_builds({"81", "7", "80"}), "7,80,81")
+        for value in ("*", "2,*", "0", "02", "-1", "6\nEVIL=1", "1.0.2", ",", "1,", "1" * 4097, None):
             with self.subTest(value=str(value)[:20]), self.assertRaises(ValueError):
                 builds.parse_builds(value)
 

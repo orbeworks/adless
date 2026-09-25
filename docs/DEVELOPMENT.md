@@ -35,20 +35,17 @@ silencioso do setup reproduzível.
 
 | Branch | Identidade/ambiente | Automação autorizada pelo desenho |
 | --- | --- | --- |
-| `develop` | `Adless Dev` (`com.orbeworks.adless.dev`), configurações `Debug Dev`/`Release Dev`, StoreKit local e Worker de desenvolvimento | Desenvolvimento local e deploy isolado de `adless-dns-development`; não alimenta TestFlight |
-| `beta` | App oficial `Adless`, assinatura automática e Worker de produção | Dois workflows isolados do Xcode Cloud: um distribui ao TestFlight Internal e o outro ao TestFlight External |
+| `develop` | `Adless Dev` (`com.orbeworks.adless.dev`) no Xcode ou app oficial `Adless` no workflow de distribuição | Desenvolvimento local, Worker Dev e distribuição TestFlight |
 | `main` | App oficial e ambiente de produção | Submissão App Store, Worker de produção e landing Railway conforme seus filtros/configurações |
 
-O fluxo de promoção é `develop` → `beta` → `main`, portanto os arquivos de todos
-os ambientes seguem para as branches posteriores. Isso não mistura as
-identidades em runtime: `Adless Dev` e `[env.development]` continuam isolados
-pelo scheme/configuração e pela seleção explícita `--env development`, enquanto
-os dois fluxos da `beta` geram o app oficial. TestFlight Internal e External não
-são estágios sequenciais do mesmo workflow; cada um tem seu próprio workflow
-Xcode Cloud e seus próprios critérios de distribuição.
-Um push em `develop` abre uma PR de promoção para `beta` se nenhuma estiver
-aberta; um push em `beta` abre a correspondente PR para `main`. Os workflows
-apenas criam a PR, são serializados por par de branches e nunca fazem merge
+O fluxo de promoção é `develop` → `main`. Isso não mistura as identidades em
+runtime: `Adless Dev` e `[env.development]` continuam isolados pelo
+scheme/configuração e pela seleção explícita `--env development`; o workflow de
+distribuição usa o app oficial e o Worker de produção. TestFlight Internal e
+External continuam sendo workflows independentes, mas ambos partem de
+`develop`.
+Um push em `develop` abre uma PR de promoção para `main` se nenhuma estiver
+aberta. O workflow apenas cria a PR, é serializado por esse par de branches e nunca faz merge
 automático. Para funcionarem com `GITHUB_TOKEN`, o repositório precisa manter
 habilitada em **Settings → Actions → General → Workflow permissions** a opção
 **Allow GitHub Actions to create and approve pull requests**. Os workflows
@@ -157,7 +154,7 @@ permanecem **Pending** até inspeção autorizada do estado remoto.
 | Cloudflare Workers Builds (development) | branch `develop` do repositório conectado ao Worker `adless-dns-development` | Prepara, valida, compila e publica o ambiente Dev diretamente no Cloudflare. |
 | Railway landing | conexão direta ao repositório `andre-fig/adless`, branch `main` | O serviço Railway usa `apps/landing-page` como raiz e publica após push; não passa pelo GitHub Actions. |
 | [update-blocklist.yml](../.github/workflows/update-blocklist.yml) | Domingo 03:17 UTC; manual | Testa/gera/valida e faz commit/push de seis artefatos; não publica Worker ou Railway diretamente. |
-| Xcode Cloud | `beta` e `main`, configurados no App Store Connect | `beta`: TestFlight interno e externo em workflows isolados. `main`: App Store com liberação após aprovação. |
+| Xcode Cloud | `develop` e `main`, configurados no App Store Connect | `develop`: TestFlight interno e externo em workflows isolados. `main`: App Store com liberação após aprovação. |
 
 Os dois workflows iOS usam o scheme `Adless`, não `Adless Dev`; detalhes,
 comandos App Store Connect e diferenças entre upload/revisão/disponibilidade

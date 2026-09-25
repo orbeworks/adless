@@ -62,7 +62,17 @@ export interface AuthorizationRecord {
   rotationNonceHash: string;
 }
 
-type StoredAuthorizationRecord = LegacyAuthorizationRecord | AuthorizationRecord;
+interface SubscriptionDisabledAuthorizationRecord {
+  schemaVersion: 3;
+  accessBasis: "subscription-disabled";
+  installationId: string;
+  dnsTokenHash: string;
+  statsTokenHash: string;
+  rotationNonceHash: string;
+  updatedAt: number;
+}
+
+type StoredAuthorizationRecord = LegacyAuthorizationRecord | AuthorizationRecord | SubscriptionDisabledAuthorizationRecord;
 
 interface TokenRecord {
   schemaVersion: 1;
@@ -169,6 +179,7 @@ export interface AuthorizationDependencies {
   verifyNotification?: (jws: string) => Promise<AppleNotificationPayload>;
   verifyRenewalInfo?: (jws: string) => Promise<AppleRenewalInfoPayload>;
   appleJWSOptions?: AppleJWSVerificationOptions;
+  subscriptionRequired?: boolean;
 }
 
 function authKey(suffix: string): string {
@@ -339,6 +350,21 @@ function normalizeAuthorizationRecord(record: StoredAuthorizationRecord | null):
   };
 }
 
+function normalizeSubscriptionDisabledRecord(
+  record: StoredAuthorizationRecord | null,
+): SubscriptionDisabledAuthorizationRecord | null {
+  if (!record
+    || record.schemaVersion !== 3
+    || record.accessBasis !== "subscription-disabled"
+    || !validInstallationId(record.installationId)
+    || !/^[a-f0-9]{64}$/.test(record.dnsTokenHash)
+    || !/^[a-f0-9]{64}$/.test(record.statsTokenHash)
+    || !/^[a-f0-9]{64}$/.test(record.rotationNonceHash)
+    || !Number.isSafeInteger(record.updatedAt)
+    || record.updatedAt < 0) return null;
+  return record;
+}
+
 async function deriveTokens(
   secret: string | undefined,
   installationId: string,
@@ -365,6 +391,37 @@ async function deriveTokens(
       transaction.environment,
       transaction.originalTransactionId,
       transaction.transactionId,
+      rotationNonce,
+    ]);
+    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(context));
+    return base64URL(new Uint8Array(signature));
+  };
+  const [dnsToken, statsToken] = await Promise.all([derive("dns"), derive("stats")]);
+  return { dnsToken, statsToken };
+}
+
+async function deriveSubscriptionDisabledTokens(
+  secret: string | undefined,
+  installationId: string,
+  rotationNonce: string,
+): Promise<{ dnsToken: string; statsToken: string }> {
+  const encoder = new TextEncoder();
+  const secretBytes = encoder.encode(secret ?? "");
+  if (secretBytes.byteLength < 32 || secretBytes.byteLength > 1024) {
+    throw new Error("token derivation secret is not configured");
+  }
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const derive = async (role: TokenRole): Promise<string> => {
+    const context = JSON.stringify([
+      "adless-subscription-disabled-authorization-v1",
+      role,
+      installationId,
       rotationNonce,
     ]);
     const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(context));
@@ -437,7 +494,7 @@ function validTestFlightAppTransaction(
   if (!appTransaction || transaction.environment !== "Sandbox") return false;
   // TestFlight uses Apple's Sandbox environment. Sandbox is not, by itself,
   // evidence that the request came from an uploaded build; development-signed
-  // apps can use it too, hence the additional signed fields and build allowlist.
+  // apps can use it too, hence the additional signed fields and build-number allowlist.
   return appTransaction.receiptType === "Sandbox"
     && appTransaction.bundleId === (env.APPLE_BUNDLE_ID ?? "com.orbeworks.adless")
     // Apple omits appAppleId/appID from AppTransaction in Sandbox and Xcode.
@@ -553,6 +610,7 @@ export async function authorizeToken(
   token: string,
   role: TokenRole,
   now = Date.now(),
+  subscriptionRequirement: boolean | (() => Promise<boolean>) = true,
 ): Promise<TokenAuthorization> {
   if (!env.AUTH || !TOKEN_PATTERN.test(token)) return { kind: "rejected", reason: "unknown" };
   const tokenHash = await sha256Hex(token);
@@ -561,17 +619,31 @@ export async function authorizeToken(
     return { kind: "rejected", reason: "unknown" };
   }
 
-  const record = await readAuthorizationRecord(env.AUTH, mapping.installationId);
-  if (!record || record.installationId !== mapping.installationId) {
+  const storedRecord = await readJSON<StoredAuthorizationRecord>(env.AUTH, installationKey(mapping.installationId));
+  const record = normalizeAuthorizationRecord(storedRecord);
+  const subscriptionDisabledRecord = normalizeSubscriptionDisabledRecord(storedRecord);
+  const credentialRecord = record ?? subscriptionDisabledRecord;
+  if (!credentialRecord || credentialRecord.installationId !== mapping.installationId) {
     return { kind: "rejected", reason: "unknown" };
   }
-  const currentHash = role === "dns" ? record.dnsTokenHash : record.statsTokenHash;
+  const currentHash = role === "dns" ? credentialRecord.dnsTokenHash : credentialRecord.statsTokenHash;
   // Superseded mappings remain known so an iPhone that did not receive or
   // persist the rotation response retains DNS connectivity. They never need
   // the authority object, block, or access statistics.
   if (currentHash !== tokenHash) {
     return role === "dns"
-      ? { kind: "passThrough", installationId: mapping.installationId, accessUntil: record.accessUntil }
+      ? { kind: "passThrough", installationId: mapping.installationId, accessUntil: record?.accessUntil ?? 0 }
+      : { kind: "rejected", reason: "forbidden" };
+  }
+  const subscriptionRequired = typeof subscriptionRequirement === "function"
+    ? await subscriptionRequirement()
+    : subscriptionRequirement;
+  if (!subscriptionRequired) {
+    return { kind: "active", installationId: mapping.installationId, accessUntil: Number.MAX_SAFE_INTEGER };
+  }
+  if (!record) {
+    return role === "dns"
+      ? { kind: "passThrough", installationId: mapping.installationId, accessUntil: 0 }
       : { kind: "rejected", reason: "forbidden" };
   }
   let authority: SubscriptionAuthorityEvent | null;
@@ -783,6 +855,74 @@ async function validCurrentCredentialProof(
     && statsMapping?.schemaVersion === 1
     && statsMapping.installationId === installationId
     && statsMapping.role === "stats";
+}
+
+async function validCurrentCredentialProofForRecord(
+  kv: AuthorizationKV,
+  installationId: string,
+  record: StoredAuthorizationRecord,
+  proof: CurrentCredentialProof | undefined,
+): Promise<boolean> {
+  if (!proof || !await validCurrentCredentialProof(kv, installationId, proof)) return false;
+  const [dnsHash, statsHash] = await Promise.all([
+    sha256Hex(proof.dnsToken),
+    sha256Hex(proof.statsToken),
+  ]);
+  return dnsHash === record.dnsTokenHash && statsHash === record.statsTokenHash;
+}
+
+export async function registerSubscriptionDisabledInstallation(
+  env: AuthorizationEnvironment,
+  installationId: string,
+  rotationNonce: string,
+  now = Date.now(),
+  currentCredentialProof?: CurrentCredentialProof,
+): Promise<{ dnsToken: string; statsToken: string; installationId: string; accessUntil: number }> {
+  const kv = env.AUTH;
+  if (!kv || !validInstallationId(installationId) || !TOKEN_PATTERN.test(rotationNonce)) {
+    throw new Error("invalid authorization data");
+  }
+
+  const [storedRecord, rotationNonceHash] = await Promise.all([
+    readJSON<StoredAuthorizationRecord>(kv, installationKey(installationId)),
+    sha256Hex(rotationNonce),
+  ]);
+  const previous = normalizeSubscriptionDisabledRecord(storedRecord);
+  const credentials = await deriveSubscriptionDisabledTokens(
+    env.AUTH_TOKEN_DERIVATION_SECRET,
+    installationId,
+    rotationNonce,
+  );
+  const [dnsTokenHash, statsTokenHash] = await Promise.all([
+    sha256Hex(credentials.dnsToken),
+    sha256Hex(credentials.statsToken),
+  ]);
+
+  if (previous?.rotationNonceHash === rotationNonceHash) {
+    if (previous.dnsTokenHash !== dnsTokenHash || previous.statsTokenHash !== statsTokenHash) {
+      throw new Error("idempotent token derivation mismatch");
+    }
+    return { ...credentials, installationId, accessUntil: Number.MAX_SAFE_INTEGER };
+  }
+
+  if (storedRecord
+    && !await validCurrentCredentialProofForRecord(kv, installationId, storedRecord, currentCredentialProof)) {
+    throw new Error("credential rotation requires current credential proof");
+  }
+
+  const record: SubscriptionDisabledAuthorizationRecord = {
+    schemaVersion: 3,
+    accessBasis: "subscription-disabled",
+    installationId,
+    dnsTokenHash,
+    statsTokenHash,
+    rotationNonceHash,
+    updatedAt: now,
+  };
+  await kv.put(tokenKey(dnsTokenHash), JSON.stringify({ schemaVersion: 1, installationId, role: "dns" }));
+  await kv.put(tokenKey(statsTokenHash), JSON.stringify({ schemaVersion: 1, installationId, role: "stats" }));
+  await kv.put(installationKey(installationId), JSON.stringify(record));
+  return { ...credentials, installationId, accessUntil: Number.MAX_SAFE_INTEGER };
 }
 
 export async function registerInstallation(
@@ -1073,14 +1213,34 @@ export async function handleAuthorizationRegister(
   const hasCurrentCredentialProof = currentDnsToken.length > 0 || currentStatsToken.length > 0;
   if (!validInstallationId(installationId)
     || !TOKEN_PATTERN.test(rotationNonce)
-    || transactionJWS.length === 0
     || transactionJWS.length > 128 * 1024
     || appTransactionJWS.length > 128 * 1024
     || (hasCurrentCredentialProof
       && (!TOKEN_PATTERN.test(currentDnsToken) || !TOKEN_PATTERN.test(currentStatsToken)))) {
+    console.warn("authorization.register.rejected", { reason: "invalid_request" });
     return jsonResponse({ error: "invalid request" }, 400);
   }
 
+  if (dependencies.subscriptionRequired === false && transactionJWS.length === 0) {
+    if (appTransactionJWS.length > 0) return jsonResponse({ error: "invalid request" }, 400);
+    try {
+      const result = await registerSubscriptionDisabledInstallation(
+        env,
+        installationId,
+        rotationNonce,
+        dependencies.now?.() ?? Date.now(),
+        hasCurrentCredentialProof ? { dnsToken: currentDnsToken, statsToken: currentStatsToken } : undefined,
+      );
+      return jsonResponse(result);
+    } catch {
+      console.warn("authorization.register.rejected", { reason: "access_policy_not_authorized" });
+      return jsonResponse({ error: "access policy not authorized" }, 401);
+    }
+  }
+  if (transactionJWS.length === 0) return jsonResponse({ error: "invalid request" }, 400);
+
+  let appleEnvironment: AppleEnvironment | undefined;
+  let appVersion: string | undefined;
   try {
     const now = dependencies.now?.() ?? Date.now();
     const jwsOptions = {
@@ -1091,11 +1251,13 @@ export async function handleAuthorizationRegister(
     const transaction = dependencies.verifyTransaction
       ? await dependencies.verifyTransaction(transactionJWS)
       : await verifyAppleJWS<AppleTransactionPayload>(transactionJWS, jwsOptions);
+    appleEnvironment = transaction.environment;
     const appTransaction = appTransactionJWS.length > 0
       ? dependencies.verifyAppTransaction
         ? await dependencies.verifyAppTransaction(appTransactionJWS)
         : await verifyAppleJWS<AppleAppTransactionPayload>(appTransactionJWS, jwsOptions)
       : undefined;
+    appVersion = appTransaction?.applicationVersion;
     const result = await registerInstallation(
       env,
       installationId,
@@ -1107,6 +1269,11 @@ export async function handleAuthorizationRegister(
     );
     return jsonResponse(result);
   } catch {
+    console.warn("authorization.register.rejected", {
+      appleEnvironment: appleEnvironment ?? null,
+      appVersion: appVersion ?? null,
+      reason: "transaction_not_authorized",
+    });
     return jsonResponse({ error: "transaction not authorized" }, 401);
   }
 }
