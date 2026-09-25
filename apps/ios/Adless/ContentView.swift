@@ -96,14 +96,10 @@ struct ContentView: View {
                     }
                 }
 
-                VStack(spacing: viewModel.hasSubscription ? 24 : 16) {
+                VStack(spacing: viewModel.hasAccess ? 24 : 16) {
                 Button {
-                    if viewModel.hasSubscription {
-                        protectionStateAtTransitionStart = viewModel.isProtectionActive
-                        Task { await viewModel.toggle() }
-                    } else {
-                        viewModel.isSubscriptionPresented = true
-                    }
+                    protectionStateAtTransitionStart = viewModel.isProtectionActive
+                    Task { await viewModel.toggle() }
                 } label: {
                     ZStack {
                         Image(systemName: "power")
@@ -147,14 +143,14 @@ struct ContentView: View {
                 .disabled(viewModel.isProtectionTransitioning)
                 .accessibilityLabel(viewModel.isProtectionTransitioning
                                     ? "Updating protection"
-                                    : (viewModel.hasSubscription
+                                    : (viewModel.hasAccess
                                        ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
                                        : "Subscribe to turn on blocking"))
-                .accessibilityHint(viewModel.hasSubscription
+                .accessibilityHint(viewModel.hasAccess
                                    ? "Turns DNS blocking on or off"
                                    : "Opens subscription options")
 
-                if !viewModel.hasSubscription {
+                if !viewModel.hasAccess {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
                             .font(.caption.weight(.medium))
@@ -170,7 +166,7 @@ struct ContentView: View {
                 }
                 }
 
-                if viewModel.hasSubscription {
+                if viewModel.hasAccess {
                     BlockingStatsView(
                         blockedTodayValue: viewModel.blockedTodayCount.formatted(.number),
                         allTimeValue: viewModel.allTimeBlockCount.formatted(.number)
@@ -178,7 +174,7 @@ struct ContentView: View {
                     .background(statsBackgroundStyle, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
 
-                if viewModel.hasSubscription {
+                if viewModel.hasAccess {
                     VStack(spacing: 4) {
                         Text(viewModel.isProtectionActive
                              ? "Browse cleaner. Stay private."
@@ -207,7 +203,7 @@ struct ContentView: View {
                         .padding(.top, 2)
                 }
 
-                if !viewModel.hasSubscription {
+                if !viewModel.hasAccess {
                     BlockingStatsView(
                         blockedTodayValue: viewModel.blockedTodayCount.formatted(.number),
                         allTimeValue: viewModel.allTimeBlockCount.formatted(.number)
@@ -222,7 +218,7 @@ struct ContentView: View {
             .padding(.horizontal, 32)
             .padding(.vertical)
 
-            if viewModel.isSubscriptionPresented {
+            if viewModel.isSubscriptionPresented && viewModel.isSubscriptionRequired {
                 ZStack {
                     Rectangle()
                         .fill(.ultraThinMaterial)
@@ -271,7 +267,11 @@ struct ContentView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { viewModel.isSubscriptionPresented && !viewModel.isPreparing },
+                get: {
+                    viewModel.isSubscriptionPresented
+                        && viewModel.isSubscriptionRequired
+                        && !viewModel.isPreparing
+                },
                 set: { viewModel.isSubscriptionPresented = $0 }
             )
         ) {

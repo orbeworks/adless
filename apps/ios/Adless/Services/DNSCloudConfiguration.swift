@@ -5,6 +5,7 @@ enum DNSCloudConfiguration {
     nonisolated static let statsPath = "/v1/stats"
     nonisolated static let blockingPath = "/v1/blocking"
     nonisolated static let authorizationPath = "/v1/authorization/register"
+    nonisolated static let accessPolicyPath = "/v1/access-policy"
 
     nonisolated static var baseURL: URL {
         guard let url = URL(string: BuildEnvironment.dnsCloudBaseURL),
@@ -37,6 +38,10 @@ enum DNSCloudConfiguration {
 
     nonisolated static var authorizationURL: URL {
         baseURL.appendingPathComponent(authorizationPath)
+    }
+
+    nonisolated static var accessPolicyURL: URL {
+        baseURL.appendingPathComponent(accessPolicyPath)
     }
 
     nonisolated static func isAdlessEndpoint(_ url: URL) -> Bool {

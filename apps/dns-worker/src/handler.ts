@@ -1,4 +1,5 @@
 import { createBlocklist, type Blocklist, type BlocklistMetadata } from "./blocklist.js";
+import { subscriptionIsRequired } from "./access-policy.js";
 import {
   blockedResponse,
   BLOCKED_RESPONSE_TTL,
@@ -60,6 +61,7 @@ export interface WorkerDependencies {
   rateLimit?: number;
   upstreamTimeoutMs?: number;
   authorizeToken?: (env: WorkerEnvironment, token: string, role: TokenRole, now: number) => Promise<TokenAuthorization>;
+  subscriptionIsRequired?: (env: WorkerEnvironment) => Promise<boolean>;
   authorization?: AuthorizationDependencies;
 }
 
@@ -358,17 +360,28 @@ export function createDNSWorker(blocklistText: string, metadata: BlocklistMetada
   return {
     async fetch(request: Request, env: WorkerEnvironment, context: WorkerExecutionContext): Promise<Response> {
       const url = new URL(request.url);
-      const authorizeToken = dependencies.authorizeToken ?? authorizeTokenInKV;
+      const loadSubscriptionRequirement = dependencies.subscriptionIsRequired ?? subscriptionIsRequired;
+      const authorizeToken = dependencies.authorizeToken
+        ?? ((authorizationEnv: WorkerEnvironment, token: string, role: TokenRole, timestamp: number) =>
+          authorizeTokenInKV(authorizationEnv, token, role, timestamp, () => loadSubscriptionRequirement(authorizationEnv)));
       if (url.pathname === "/healthz") {
         if (request.method !== "GET" && request.method !== "HEAD") {
           return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
         }
         return jsonResponse({ status: "ok", environment: env.DEPLOYMENT_ENV ?? "unknown" });
       }
+      if (url.pathname === "/v1/access-policy") {
+        if (request.method !== "GET") {
+          return new Response(null, { status: 405, headers: { allow: "GET" } });
+        }
+        return jsonResponse({ subscriptionRequired: await loadSubscriptionRequirement(env) });
+      }
       if (url.pathname === "/v1/authorization/register") {
+        const subscriptionRequired = await loadSubscriptionRequirement(env);
         return handleAuthorizationRegister(request, env, {
           ...dependencies.authorization,
           now,
+          subscriptionRequired,
         });
       }
       if (url.pathname === "/v1/notifications/apple") {

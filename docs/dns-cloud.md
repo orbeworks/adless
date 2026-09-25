@@ -39,11 +39,12 @@ Durable Objects, segredo, bundle e política StoreKit também são separados.
 | Endpoint Implemented | Método | Contrato |
 | --- | --- | --- |
 | `/healthz` | GET, HEAD | Saúde superficial e ambiente declarado |
+| `/v1/access-policy` | GET | Política efetiva do Worker; retorna se a assinatura é obrigatória |
 | `/{dnsToken}/dns-query` | POST | Pacote em corpo `application/dns-message`; token Base64URL de 43 caracteres no pathname |
 | `/{dnsToken}/dns-query` | GET | Pacote Base64URL sem padding no parâmetro `dns`; mesmo papel de token |
 | `/v1/stats` | GET | Bearer stats corrente e assinatura ativa; retorna `blockedTotal`, `updatedAt` |
 | `/v1/blocking` | GET, PUT | Bearer stats corrente e assinatura ativa; lê/altera `blockingEnabled` por instalação |
-| `/v1/authorization/register` | POST | JSON com JWS/instalação/nonce; retorna o par de tokens; contrato em [SECURITY.md](SECURITY.md) |
+| `/v1/authorization/register` | POST | JSON com instalação/nonce e, quando a assinatura é obrigatória, JWS; retorna o par de tokens; contrato em [SECURITY.md](SECURITY.md) |
 | `/v1/notifications/apple` | POST | JSON com `signedPayload` Apple V2, verificado novamente no servidor |
 
 **Implemented:** DoH reconhece hash/papel/instalação em `AUTH` primeiro.
@@ -124,6 +125,7 @@ arquivo. `workers.dev` usa hostname fornecido pela Cloudflare;
 | `AUTHORITY` | Segundo binding da **mesma classe/namespace**, IDs por ambiente e hash de assinatura |
 | migration `v1` | `new_sqlite_classes` de `StatsDurableObject`; adicionar o binding AUTHORITY não declara nova classe/migration |
 | `AUTH_TOKEN_DERIVATION_SECRET` | Secret necessário à emissão; não é `[vars]` e não deve ser lido/impresso |
+| `CONFIGCAT_SDK_KEY` | Secret de leitura usado pelo SDK ConfigCat do Worker; ausência ou falha exige assinatura por padrão |
 | `DEPLOYMENT_ENV` | Rótulo de health, localmente `production` |
 | `APPLE_BUNDLE_ID`, `APPLE_APP_ID` | Identificadores esperados de app e notificações Apple; fonte canônica é o TOML |
 | `APPLE_ALLOWED_ENVIRONMENTS` | Localmente `Production` no registro normal |
@@ -136,6 +138,14 @@ bindings próprios de `AUTH`, `STATS` e `AUTHORITY`, além de segredo próprio. 
 aceita somente `environment=Xcode` e `com.orbeworks.adless.dev`; notificações
 Apple e TestFlight ficam desabilitados. O alvo top-level de produção conserva
 seus bindings, segredo, bundle e políticas Production/Sandbox.
+
+O único setting remoto de acesso é o booleano ConfigCat
+`subscription_required`. O Worker usa lazy loading com cache de 60 segundos e é
+a autoridade: `true` conserva o fluxo StoreKit; `false` permite emissão de
+credenciais sem JWS. O iOS lê `/v1/access-policy`, não o ConfigCat diretamente.
+Se o SDK key, a configuração ou o CDN não estiver disponível sem cache válido,
+o valor efetivo é `true`. Configure `CONFIGCAT_SDK_KEY` separadamente como
+secret nos ambientes production e development; nunca grave ou exiba seu valor.
 
 **Implemented (automação):** os uploads interno e externo de TestFlight a partir
 de `develop` adicionam o número da build validada pela Apple à allowlist do Worker de produção,

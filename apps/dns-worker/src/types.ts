@@ -56,6 +56,7 @@ export interface WorkerEnvironment {
   APPLE_NOTIFICATION_ENVIRONMENTS?: string;
   APPLE_TESTFLIGHT_BUILD_VERSIONS?: string;
   XCODE_STOREKIT_CERTIFICATE_SHA256?: string;
+  CONFIGCAT_SDK_KEY?: string;
   DEPLOYMENT_ENV?: "production" | "development";
 }
 

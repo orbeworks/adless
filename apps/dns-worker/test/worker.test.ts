@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { cryptoProvider, X509CertificateGenerator } from "@peculiar/x509";
 import { SignJWT } from "jose";
 import { verifyAppleJWS } from "../src/apple-jws.js";
+import { subscriptionIsRequired } from "../src/access-policy.js";
 import { createBlocklist, normalizeDomain } from "../src/blocklist.js";
 import { createDNSWorker } from "../src/handler.js";
 import { BLOCKED_RESPONSE_TTL, parseDNSMessage } from "../src/dns.js";
@@ -389,6 +390,27 @@ test("health check identifies production without resolving DNS", async () => {
   assert.equal(result.status, 200);
   assert.deepEqual(await result.json(), { status: "ok", environment: "production" });
   assert.equal(calls, 0);
+});
+
+test("access policy exposes the Worker-authoritative subscription requirement", async () => {
+  const worker = makeWorker(undefined, undefined, {
+    subscriptionIsRequired: async () => false,
+  });
+  const response = await worker.fetch(
+    new Request("https://worker.example.test/v1/access-policy"),
+    {},
+    context(),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { subscriptionRequired: false });
+  assert.equal(
+    (await worker.fetch(new Request("https://worker.example.test/v1/access-policy", { method: "POST" }), {}, context())).status,
+    405,
+  );
+});
+
+test("access policy fails closed when ConfigCat is not configured", async () => {
+  assert.equal(await subscriptionIsRequired({}), true);
 });
 
 test("accepts valid POST and GET DoH messages with the wire content type", async () => {
@@ -890,6 +912,98 @@ test("malformed StoreKit JWS cannot issue authorization credentials", async () =
   );
   assert.equal(result.status, 401);
   assert.equal(kv.values.size, 0);
+});
+
+test("disabled subscription requirement issues credentials without StoreKit", async () => {
+  const kv = new MemoryKV();
+  const request = new Request("https://worker.example.test/v1/authorization/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      installationId: INSTALLATION_ID,
+      transactionJWS: "",
+      rotationNonce: ROTATION_NONCE,
+    }),
+  });
+  const registration = await handleAuthorizationRegister(
+    request,
+    environmentForAuthorization(kv),
+    { now: () => AUTH_NOW, subscriptionRequired: false },
+  );
+  assert.equal(registration.status, 200);
+  const credentials = await registration.json() as { dnsToken: string; statsToken: string };
+
+  assert.equal(
+    (await authorizeToken(environmentForAuthorization(kv), credentials.dnsToken, "dns", AUTH_NOW, false)).kind,
+    "active",
+  );
+  assert.equal(
+    (await authorizeToken(environmentForAuthorization(kv), credentials.statsToken, "stats", AUTH_NOW, false)).kind,
+    "active",
+  );
+  assert.equal(
+    (await authorizeToken(environmentForAuthorization(kv), credentials.dnsToken, "dns", AUTH_NOW, true)).kind,
+    "passThrough",
+  );
+  assert.equal(
+    (await authorizeToken(environmentForAuthorization(kv), credentials.statsToken, "stats", AUTH_NOW, true)).kind,
+    "rejected",
+  );
+
+  const unauthorizedRotation = await handleAuthorizationRegister(
+    new Request("https://worker.example.test/v1/authorization/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        installationId: INSTALLATION_ID,
+        transactionJWS: "",
+        rotationNonce: OTHER_ROTATION_NONCE,
+      }),
+    }),
+    environmentForAuthorization(kv),
+    { now: () => AUTH_NOW + 1, subscriptionRequired: false },
+  );
+  assert.equal(unauthorizedRotation.status, 401);
+  assert.equal(
+    (await authorizeToken(environmentForAuthorization(kv), credentials.dnsToken, "dns", AUTH_NOW + 1, false)).kind,
+    "active",
+  );
+});
+
+test("subscription-disabled registration fails closed when subscription is required", async () => {
+  const kv = new MemoryKV();
+  const response = await handleAuthorizationRegister(
+    new Request("https://worker.example.test/v1/authorization/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        installationId: INSTALLATION_ID,
+        transactionJWS: "",
+        rotationNonce: ROTATION_NONCE,
+      }),
+    }),
+    environmentForAuthorization(kv),
+    { now: () => AUTH_NOW, subscriptionRequired: true },
+  );
+  assert.equal(response.status, 400);
+  assert.equal(kv.values.size, 0);
+});
+
+test("unknown tokens are rejected before loading remote access policy", async () => {
+  const kv = new MemoryKV();
+  let policyCalls = 0;
+  const result = await authorizeToken(
+    environmentForAuthorization(kv),
+    TOKEN,
+    "dns",
+    AUTH_NOW,
+    async () => {
+      policyCalls += 1;
+      return false;
+    },
+  );
+  assert.deepEqual(result, { kind: "rejected", reason: "unknown" });
+  assert.equal(policyCalls, 0);
 });
 
 test("single-certificate Xcode JWS requires one of the explicitly pinned signing certificates", async () => {

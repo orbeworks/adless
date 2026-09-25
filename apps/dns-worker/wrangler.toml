@@ -18,6 +18,7 @@ APPLE_ALLOWED_ENVIRONMENTS = "Production"
 APPLE_NOTIFICATION_ENVIRONMENTS = "Production,Sandbox"
 APPLE_TESTFLIGHT_BUILD_VERSIONS = "2,6,7,80,81"
 # AUTH_TOKEN_DERIVATION_SECRET is configured as a Worker secret, never a var.
+# CONFIGCAT_SDK_KEY is also configured separately as a Worker secret.
 
 [[kv_namespaces]]
 binding = "AUTH"
