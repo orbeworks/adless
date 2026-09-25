@@ -1,10 +1,18 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
     @State private var subscriptionSheetHeight: CGFloat?
+    @State private var protectionStateAtTransitionStart = false
+
+    private var buttonShowsActiveProtection: Bool {
+        viewModel.isProtectionTransitioning
+            ? protectionStateAtTransitionStart
+            : viewModel.isProtectionActive
+    }
 
     private var subscriptionDetent: PresentationDetent {
         guard let subscriptionSheetHeight else { return .medium }
@@ -91,6 +99,7 @@ struct ContentView: View {
                 VStack(spacing: viewModel.hasSubscription ? 24 : 16) {
                 Button {
                     if viewModel.hasSubscription {
+                        protectionStateAtTransitionStart = viewModel.isProtectionActive
                         Task { await viewModel.toggle() }
                     } else {
                         viewModel.isSubscriptionPresented = true
@@ -99,28 +108,27 @@ struct ContentView: View {
                     ZStack {
                         Image(systemName: "power")
                             .font(.system(size: 56, weight: .medium))
-                            .foregroundStyle(viewModel.isProtectionActive
+                            .foregroundStyle(buttonShowsActiveProtection
                                              ? Color.white
                                              : inactiveButtonForeground)
 
                         if viewModel.isProtectionTransitioning {
                             ProtectionProgressRing(
-                                color: viewModel.isProtectionActive
+                                color: buttonShowsActiveProtection
                                     ? .white
                                     : activeButtonBackground
                             )
                             .padding(8)
-                            .transition(.opacity)
                         }
                     }
                     .frame(width: 144, height: 144)
-                    .background(viewModel.isProtectionActive
+                    .background(buttonShowsActiveProtection
                                 ? activeButtonBackground
                                 : inactiveButtonBackground)
                     .overlay {
                         Circle()
                             .stroke(
-                                viewModel.isProtectionActive
+                                buttonShowsActiveProtection
                                     ? activeButtonBorder
                                     : inactiveButtonBorder,
                                 lineWidth: 1
@@ -128,12 +136,12 @@ struct ContentView: View {
                     }
                     .clipShape(Circle())
                     .shadow(
-                        color: viewModel.isProtectionActive
+                        color: buttonShowsActiveProtection
                             ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12)
                             : Color.black.opacity(colorScheme == .dark ? 0.30 : 0.14),
-                        radius: viewModel.isProtectionActive && colorScheme == .dark ? 12 : 10,
+                        radius: buttonShowsActiveProtection && colorScheme == .dark ? 12 : 10,
                         x: 0,
-                        y: viewModel.isProtectionActive && colorScheme == .dark ? 7 : 6
+                        y: buttonShowsActiveProtection && colorScheme == .dark ? 7 : 6
                     )
                 }
                 .disabled(viewModel.isProtectionTransitioning)
@@ -234,7 +242,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.isProtectionActive)
-        .animation(.easeInOut(duration: 0.18), value: viewModel.isProtectionTransitioning)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSubscriptionPresented)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isPreparing)
         .contentShape(Rectangle())
@@ -288,32 +295,92 @@ struct ContentView: View {
     }
 }
 
-private struct ProtectionProgressRing: View {
+private struct ProtectionProgressRing: UIViewRepresentable {
     let color: Color
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var rotation = 0.0
 
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(color.opacity(0.16), lineWidth: 3)
+    func makeUIView(context: Context) -> SpinningRingView {
+        let view = SpinningRingView()
+        view.isAccessibilityElement = false
+        return view
+    }
 
-            Circle()
-                .trim(from: 0.06, to: 0.32)
-                .stroke(
-                    color,
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-                .rotationEffect(.degrees(rotation))
+    func updateUIView(_ view: SpinningRingView, context: Context) {
+        view.update(color: UIColor(color), isAnimating: !reduceMotion)
+    }
+}
+
+private final class SpinningRingView: UIView {
+    private let trackLayer = CAShapeLayer()
+    private let progressLayer = CAShapeLayer()
+    private var shouldAnimate = true
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+
+        for shapeLayer in [trackLayer, progressLayer] {
+            shapeLayer.fillColor = UIColor.clear.cgColor
+            shapeLayer.lineWidth = 3
+            layer.addSublayer(shapeLayer)
         }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
+        progressLayer.lineCap = .round
+        progressLayer.strokeStart = 0.06
+        progressLayer.strokeEnd = 0.32
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let path = UIBezierPath(ovalIn: bounds.insetBy(dx: 1.5, dy: 1.5)).cgPath
+        trackLayer.frame = bounds
+        trackLayer.path = path
+        progressLayer.frame = bounds
+        progressLayer.path = path
+        CATransaction.commit()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateAnimation()
+    }
+
+    func update(color: UIColor, isAnimating: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackLayer.strokeColor = color.withAlphaComponent(0.16).cgColor
+        progressLayer.strokeColor = color.cgColor
+        CATransaction.commit()
+
+        shouldAnimate = isAnimating
+        updateAnimation()
+    }
+
+    private func updateAnimation() {
+        guard window != nil, shouldAnimate else {
+            progressLayer.removeAnimation(forKey: "continuousRotation")
+            return
         }
-        .accessibilityHidden(true)
+        guard progressLayer.animation(forKey: "continuousRotation") == nil else { return }
+
+        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotation.fromValue = 0
+        rotation.toValue = CGFloat.pi * 2
+        rotation.duration = 1.05
+        rotation.repeatCount = .infinity
+        rotation.timingFunction = CAMediaTimingFunction(name: .linear)
+        rotation.isRemovedOnCompletion = false
+        progressLayer.add(rotation, forKey: "continuousRotation")
     }
 }
 
