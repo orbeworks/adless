@@ -657,6 +657,14 @@
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Activar bloqueo" } }
       }
     },
+    "Updating protection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updating protection" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Atualizando proteção" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Actualizando la protección" } }
+      }
+    },
     "Your blocking history is saved while protection is paused." : {
       "extractionState" : "manual",
       "localizations" : {

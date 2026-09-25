@@ -67,6 +67,7 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var hasSubscription = false
     @Published private(set) var remoteBlockingState: RemoteBlockingState = .unknown
     @Published private(set) var isProtectionStateChecking = false
+    @Published private(set) var isProtectionTransitioning = false
     @Published var isSubscriptionPresented = false
     @Published var isSystemApprovalAlertPresented = false
     @Published var isManualDisableAlertPresented = false
@@ -191,11 +192,14 @@ final class AppViewModel: ObservableObject {
 
     @MainActor
     func toggle() async {
-        guard !isPreparing else { return }
+        guard !isPreparing, !isProtectionTransitioning else { return }
         guard hasSubscription else {
             isSubscriptionPresented = true
             return
         }
+
+        isProtectionTransitioning = true
+        defer { isProtectionTransitioning = false }
 
         if isProtectionActive {
             let transaction = AdlessSentry.startTransaction(name: "protection.deactivate", operation: "blocking-preference")

@@ -96,37 +96,52 @@ struct ContentView: View {
                         viewModel.isSubscriptionPresented = true
                     }
                 } label: {
-                    Image(systemName: "power")
-                        .font(.system(size: 56, weight: .medium))
-                        .frame(width: 144, height: 144)
-                        .foregroundStyle(viewModel.isProtectionActive
-                                         ? Color.white
-                                         : inactiveButtonForeground)
-                        .background(viewModel.isProtectionActive
-                                    ? activeButtonBackground
-                                    : inactiveButtonBackground)
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    viewModel.isProtectionActive
-                                        ? activeButtonBorder
-                                        : inactiveButtonBorder,
-                                    lineWidth: 1
-                                )
+                    ZStack {
+                        Image(systemName: "power")
+                            .font(.system(size: 56, weight: .medium))
+                            .foregroundStyle(viewModel.isProtectionActive
+                                             ? Color.white
+                                             : inactiveButtonForeground)
+
+                        if viewModel.isProtectionTransitioning {
+                            ProtectionProgressRing(
+                                color: viewModel.isProtectionActive
+                                    ? .white
+                                    : activeButtonBackground
+                            )
+                            .padding(8)
+                            .transition(.opacity)
                         }
-                        .clipShape(Circle())
-                        .shadow(
-                            color: viewModel.isProtectionActive
-                                ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12)
-                                : Color.black.opacity(colorScheme == .dark ? 0.30 : 0.14),
-                            radius: viewModel.isProtectionActive && colorScheme == .dark ? 12 : 10,
-                            x: 0,
-                            y: viewModel.isProtectionActive && colorScheme == .dark ? 7 : 6
-                        )
+                    }
+                    .frame(width: 144, height: 144)
+                    .background(viewModel.isProtectionActive
+                                ? activeButtonBackground
+                                : inactiveButtonBackground)
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                viewModel.isProtectionActive
+                                    ? activeButtonBorder
+                                    : inactiveButtonBorder,
+                                lineWidth: 1
+                            )
+                    }
+                    .clipShape(Circle())
+                    .shadow(
+                        color: viewModel.isProtectionActive
+                            ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12)
+                            : Color.black.opacity(colorScheme == .dark ? 0.30 : 0.14),
+                        radius: viewModel.isProtectionActive && colorScheme == .dark ? 12 : 10,
+                        x: 0,
+                        y: viewModel.isProtectionActive && colorScheme == .dark ? 7 : 6
+                    )
                 }
-                .accessibilityLabel(viewModel.hasSubscription
-                                    ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
-                                    : "Subscribe to turn on blocking")
+                .disabled(viewModel.isProtectionTransitioning)
+                .accessibilityLabel(viewModel.isProtectionTransitioning
+                                    ? "Updating protection"
+                                    : (viewModel.hasSubscription
+                                       ? (viewModel.isProtectionActive ? "Turn off blocking" : "Turn on blocking")
+                                       : "Subscribe to turn on blocking"))
                 .accessibilityHint(viewModel.hasSubscription
                                    ? "Turns DNS blocking on or off"
                                    : "Opens subscription options")
@@ -219,6 +234,7 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.isProtectionActive)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.isProtectionTransitioning)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSubscriptionPresented)
         .animation(.easeInOut(duration: 0.2), value: viewModel.isPreparing)
         .contentShape(Rectangle())
@@ -269,6 +285,35 @@ struct ContentView: View {
                 .presentationBackground(AdlessTheme.subscriptionDrawerBackground)
                 .presentationBackgroundInteraction(.enabled)
         }
+    }
+}
+
+private struct ProtectionProgressRing: View {
+    let color: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var rotation = 0.0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.16), lineWidth: 3)
+
+            Circle()
+                .trim(from: 0.06, to: 0.32)
+                .stroke(
+                    color,
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .rotationEffect(.degrees(rotation))
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
